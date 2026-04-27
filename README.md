@@ -17,6 +17,25 @@ AI洛克是一个面向 **洛克王国 PVP** 的本地桌面辅助工具：
   - 图片资料（`.png` / `.jpg` / `.jpeg` / `.webp` / `.bmp`）直接发给多模态模型做摘要入库
 - 存储：SQLite
 
+## 获取洛克王国 Wiki 图鉴资料
+
+从 BiliGame Wiki 抓取精灵图鉴和技能图鉴的事实型索引数据，并写入本地 `data/`：
+
+```powershell
+uv run python scripts\fetch_rocom_wiki.py
+```
+
+输出：
+
+- `data/rocom_wiki/pets.json`
+- `data/rocom_wiki/pets.csv`
+- `data/rocom_wiki/skills.json`
+- `data/rocom_wiki/skills.csv`
+- `data/rocom_wiki/manifest.json`
+- 同时写入 `data/knowledge.db`，供 AI洛克检索使用
+
+数据来源采用 BiliGame Wiki 页面中可见的图鉴索引字段；不复制文章正文。
+
 ## 快速开始
 
 ### 1. 安装依赖

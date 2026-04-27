@@ -12,6 +12,7 @@ wheels/
 .venv
 
 # Runtime/user data
+data/
 data/settings.json
 data/knowledge.db
 data/captures/
