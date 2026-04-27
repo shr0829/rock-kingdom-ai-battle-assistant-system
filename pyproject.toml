@@ -1,0 +1,19 @@
+[project]
+name = "ailock"
+version = "0.1.0"
+description = "AI Lock - PVP screenshot strategy assistant"
+readme = "README.md"
+authors = [
+    { name = "shr", email = "872761346@QQ.COM" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "PySide6-Essentials>=6.10.0",
+]
+
+[project.scripts]
+ailock = "ailock:main"
+
+[build-system]
+requires = ["uv_build>=0.8.19,<0.9.0"]
+build-backend = "uv_build"

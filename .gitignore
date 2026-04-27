@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+release/
+wheels/
+*.egg-info
+*.spec
+
+# Virtual environments
+.venv
+
+# Runtime/user data
+data/settings.json
+data/knowledge.db
+data/captures/
+data/knowledge/
