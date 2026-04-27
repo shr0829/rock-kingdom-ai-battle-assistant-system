@@ -20,6 +20,14 @@ class MultimodalClientTests(unittest.TestCase):
 
         self.assertTrue(data_url.startswith("data:image/png;base64,"))
 
+    def test_headers_include_browser_user_agent_for_cloudflare_gateway(self) -> None:
+        client = MultimodalClient(AppSettings(api_key="secret"))
+
+        headers = client._build_headers()
+
+        self.assertIn("Mozilla/5.0", headers["User-Agent"])
+        self.assertEqual(headers["Authorization"], "Bearer secret")
+
 
 if __name__ == "__main__":
     unittest.main()

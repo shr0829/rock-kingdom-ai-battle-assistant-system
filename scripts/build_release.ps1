@@ -31,6 +31,13 @@ uv run --with pyinstaller --index-url $Mirror pyinstaller `
 
 $ReleaseRoot = Join-Path $ProjectRoot "release"
 $PackageRoot = Join-Path $ReleaseRoot $AppName
+$PreservedData = Join-Path $env:TEMP "AILock-preserved-data"
+if (Test-Path $PreservedData) {
+  Remove-Item -LiteralPath $PreservedData -Recurse -Force
+}
+if (Test-Path (Join-Path $PackageRoot "data")) {
+  Copy-Item -LiteralPath (Join-Path $PackageRoot "data") -Destination $PreservedData -Recurse
+}
 if (Test-Path $PackageRoot) {
   Remove-Item -LiteralPath $PackageRoot -Recurse -Force
 }
@@ -65,6 +72,11 @@ if (Test-Path $ZipPath) {
   Remove-Item -LiteralPath $ZipPath -Force
 }
 Compress-Archive -LiteralPath $PackageRoot -DestinationPath $ZipPath -Force
+
+if (Test-Path $PreservedData) {
+  Copy-Item -LiteralPath $PreservedData -Destination (Join-Path $PackageRoot "data") -Recurse
+  Remove-Item -LiteralPath $PreservedData -Recurse -Force
+}
 
 Write-Host "[AILock] Release package ready:"
 Write-Host $PackageRoot

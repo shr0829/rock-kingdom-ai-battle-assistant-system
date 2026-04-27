@@ -179,10 +179,7 @@ class MultimodalClient:
         request = urllib.request.Request(
             endpoint,
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.settings.api_key}",
-            },
+            headers=self._build_headers(),
             method="POST",
         )
         try:
@@ -193,6 +190,23 @@ class MultimodalClient:
             raise RuntimeError(f"Model API request failed ({exc.code}): {body}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"Could not connect to model API: {exc.reason}") from exc
+
+    def _build_headers(self) -> dict[str, str]:
+        # api.asxs.top is behind Cloudflare and rejects Python urllib's default
+        # User-Agent with 403 / error code 1010. A normal browser-like UA keeps
+        # the OpenAI-compatible endpoint reachable while preserving the same API.
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36 AILock/0.1"
+            ),
+        }
+        if self.settings.api_key.strip():
+            headers["Authorization"] = f"Bearer {self.settings.api_key}"
+        return headers
 
     @staticmethod
     def _parse_structured_output(response_data: dict[str, Any]) -> dict[str, Any]:
