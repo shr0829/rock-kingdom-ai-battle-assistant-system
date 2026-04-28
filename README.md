@@ -110,7 +110,8 @@ uv run ailock
 4. 应用截取当前主屏幕并请求多模态模型识别战局。
 5. 应用根据识别字段构造检索词，在 `data/knowledge.db` 中查找相关资料。
 6. 模型结合战局和资料命中结果生成回合建议。
-7. 在界面中查看三类结果：
+7. 应用把本次“截图 → 战局识别 → 本地检索 → 建议生成 → 最终结果”的每一步耗时写入 `data/logs/analysis-*.jsonl`，界面会显示对应日志路径。
+8. 在界面中查看三类结果：
    - 战局识别
    - 推荐操作
    - 资料依据
@@ -191,6 +192,7 @@ tests/
 
 data/
   knowledge.db
+  logs/              # 每次截图分析的分步耗时 JSONL 日志
   rocom_wiki/
   rocom_wiki_smoke/
   rocom_wiki_smoke_db/
@@ -217,6 +219,7 @@ data/
 - `data/settings.json`
 - `data/captures/`
 - `data/knowledge/`
+- `data/logs/`
 - `.venv/`
 - `.omx/`
 - `.tmp-tests/`

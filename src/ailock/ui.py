@@ -366,6 +366,7 @@ class MainWindow(QMainWindow):
                     "[待确认]",
                     f"识别疑点: {'；'.join(unknowns)}",
                     f"截图存档: {result.screenshot_path}",
+                    f"耗时日志: {result.timing_log_path or '未生成'}",
                 ]
             )
         )

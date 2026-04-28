@@ -93,3 +93,5 @@ class AnalysisResult:
     advice: AdviceResult
     knowledge_hits: list[KnowledgeEntry] = field(default_factory=list)
     screenshot_path: str = ""
+    timing_log_path: str = ""
+    timing_events: list[dict[str, Any]] = field(default_factory=list)
