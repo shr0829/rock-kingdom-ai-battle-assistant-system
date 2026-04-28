@@ -60,8 +60,7 @@ uv run python scripts\fetch_rocom_wiki.py --skip-detail-pages
 ### 1. 安装依赖
 
 ```powershell
-$env:UV_CACHE_DIR='E:\codex\backage\cache'
-uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+uv sync
 ```
 
 ### 2. 准备项目配置
@@ -71,6 +70,20 @@ uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 ```powershell
 Copy-Item config.example.toml config.toml
 ```
+
+或在类 Unix shell 中：
+
+```bash
+cp config.example.toml config.toml
+```
+
+然后根据你自己的环境填写或调整：
+
+- 模型服务商
+- API Base URL
+- 模型名
+- 是否需要 OpenAI 兼容认证
+- 其他运行参数
 
 ### 3. 启动应用
 
@@ -83,21 +96,6 @@ uv run ailock
 - API Key
 - Model / Base URL 默认从项目根目录 `config.toml` 读取；如果缺失，则回退到 `config.example.toml`
 - 热键（默认 `Ctrl+Shift+A`）：点击“修改热键”，直接按下想用的组合键，再确认保存。
-
-当前项目配置：
-
-```toml
-model_provider = "OpenAI"
-model = "gpt-5.5"
-review_model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
-disable_response_storage = true
-
-[model_providers.OpenAI]
-base_url = "https://api.asxs.top/v1"
-wire_api = "responses"
-requires_openai_auth = true
-```
 
 ### 5. 导入资料
 
@@ -151,16 +149,40 @@ src/ailock/
 
 本项目采用 **SemVer（语义化版本）** 管理 GitHub Release：
 
-- `v0.1.0`：首个公开可用版本（当前版本）
+- 首个公开版本通常从 `v0.1.0` 开始
 - `v0.1.x`：只修复 bug，不改公开接口预期
 - `v0.2.0`：新增功能，但仍处于 0.x 快速迭代阶段
 - `v1.0.0`：功能和使用方式基本稳定后再进入正式稳定版
 
-当前建议：
+版本维护建议：
 
-- `pyproject.toml` 保持 `0.1.0`
-- Git tag / GitHub Release 使用 `v0.1.0`
+- `pyproject.toml` 使用不带 `v` 的版本号，例如 `0.1.0`
+- Git tag / GitHub Release 使用带 `v` 的标签，例如 `v0.1.0`
 - 发布说明维护在 `CHANGELOG.md`
+- 实际当前版本以 `pyproject.toml`、Git tag 和 `CHANGELOG.md` 为准
+
+## 自动 Release
+
+仓库内置 GitHub Actions 自动发布流程：
+
+- 当你 push 一个符合 `v*` 规则的 tag（例如 `v0.1.1`）时
+- workflow 会自动读取对应的 `CHANGELOG.md` 小节
+- 然后创建或更新同名 GitHub Release
+
+典型发布流程：
+
+1. 更新 `pyproject.toml` 版本号
+2. 更新 `CHANGELOG.md`
+3. 提交代码
+4. 创建 tag，例如：
+
+   ```bash
+   git tag -a v0.1.1 -m "release v0.1.1"
+   git push origin master
+   git push origin v0.1.1
+   ```
+
+这样就会自动生成或更新对应的 GitHub Release。
 
 ## 已知边界
 
