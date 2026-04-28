@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to publish or refresh"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -21,13 +26,22 @@ jobs:
 
       - name: Build release notes from changelog
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            export RELEASE_TAG="$INPUT_TAG"
+          else
+            export RELEASE_TAG="$GITHUB_REF_NAME"
+          fi
+
           python - <<'PY'
           import os
           import pathlib
           import re
 
-          tag = os.environ["GITHUB_REF_NAME"]
+          tag = os.environ["RELEASE_TAG"]
           changelog = pathlib.Path("CHANGELOG.md")
           notes = f"Automated release for {tag}."
 
@@ -47,9 +61,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+
           if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$TAG" \
               --repo "$REPOSITORY" \
