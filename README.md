@@ -36,6 +36,25 @@ uv run python scripts\fetch_rocom_wiki.py
 
 数据来源采用 BiliGame Wiki 页面中可见的图鉴索引字段；不复制文章正文。
 
+默认会继续进入每个精灵/技能详情页补充结构化字段：
+
+- 技能：属性、类型（物攻/魔攻/状态等）、耗能、威力/伤害、效果、可学习精灵
+- 精灵：种族值总分、生命/物攻/魔攻/物防/魔防/速度分项、特性、精灵技能、血脉技能、可学技能石
+
+导出的 `pets.json/csv` 与 `skills.json/csv` 默认只保留结构化内容，不再保存页面链接、图片链接等 URL 字段。
+
+调试时可限制详情页数量：
+
+```powershell
+uv run python scripts\fetch_rocom_wiki.py --detail-limit 3 --skip-db
+```
+
+如只想保留旧版索引卡片抓取速度：
+
+```powershell
+uv run python scripts\fetch_rocom_wiki.py --skip-detail-pages
+```
+
 ## 快速开始
 
 ### 1. 安装依赖
