@@ -284,6 +284,8 @@ fix(模块): 避免……
 
 仓库默认采用 **feature 分支开发 + Pull Request 审查 + Squash Merge 合入主线**。
 
+更完整的协作约定见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+
 ### 约定
 
 - 日常开发从 `master` 拉出功能分支，例如 `feature/timing-log`、`fix/config-fallback`。
