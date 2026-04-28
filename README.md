@@ -1,142 +1,409 @@
 # AI洛克
 
-AI洛克是一个面向 **洛克王国 PVP** 的本地桌面辅助工具：
+AI洛克是一个面向 **洛克王国 PVP** 的本地桌面辅助工具。  
+它通过 **截图 + 多模态模型识图 + 本地知识库检索** 的方式，为当前回合生成可执行的操作建议。
 
-- 按热键截图当前战斗画面
-- **不走 OCR**，而是直接把截图发送给多模态大模型 API
-- 结合本地资料库（图片资料 + 文本资料）
-- 输出当前回合的 **推荐操作 + 原因**
+> 当前版本：`0.1.0`  
+> 运行平台：**Windows**  
+> 界面框架：**PySide6 / Qt**
 
-## 当前实现
+---
 
-- 桌面端：Qt / PySide6 悬浮窗口
-- 截图：Windows 内置 .NET 截屏 helper
-- 模型调用：默认按 OpenAI Responses 风格接口请求 `/responses`
-- 资料导入：
-  - 文本资料（`.txt` / `.md`）直接入库
-  - 图片资料（`.png` / `.jpg` / `.jpeg` / `.webp` / `.bmp`）直接发给多模态模型做摘要入库
-- 存储：SQLite
+## 这个项目能做什么
 
-## 获取洛克王国 Wiki 图鉴资料
+### 1. 直接截图识别战局
 
-从 BiliGame Wiki 抓取精灵图鉴和技能图鉴的事实型索引数据，并写入本地 `data/`：
+- 支持一键截取当前主屏幕
+- 不走本地 OCR
+- 直接把截图发送给兼容的多模态模型接口
+- 从截图中提取当前对战信息
 
-```powershell
-uv run python scripts\fetch_rocom_wiki.py
+当前版本重点提取这些内容：
+
+- 我方精灵
+- 对方精灵
+- 我方血量状态
+- 当前可见技能
+- 状态效果
+- 节奏/场地信息
+- 检索关键词
+- 不确定点与置信度
+
+### 2. 基于本地知识库给出回合建议
+
+识别完截图后，程序会：
+
+1. 根据战局生成检索词
+2. 在本地 SQLite 知识库中搜索相关资料
+3. 将战局信息和命中的知识一起交给模型
+4. 输出当前回合建议
+
+建议结果包含：
+
+- 推荐操作
+- 原因说明
+- 资料依据
+- 置信度
+- 注意事项
+
+### 3. 导入本地攻略资料
+
+可以把你自己的资料导入知识库中：
+
+- 文本资料：`.txt`、`.md`
+- 图片资料：`.png`、`.jpg`、`.jpeg`、`.webp`、`.bmp`
+
+导入行为：
+
+- 文本会直接截取内容摘要并入库
+- 图片会交给模型总结后入库
+
+### 4. 内置公开图鉴数据
+
+仓库当前已经包含可公开分发的洛克王国图鉴数据，例如：
+
+- 精灵图鉴结构化数据
+- 技能图鉴结构化数据
+- SQLite 知识库快照
+- 调试页与样例页
+
+这些数据可直接作为初始检索库使用。
+
+### 5. 支持全局热键
+
+- 默认热键：`Ctrl+Shift+A`
+- 支持在界面里修改
+- 适合边对战边调用
+
+### 6. 失败时优先安全降级
+
+如果截图信息不足、模型响应不稳定或接口兼容性漂移，程序会尽量：
+
+- 保留已识别到的信息
+- 明确提示哪些内容不确定
+- 给出“先补截图再决策”的保守建议
+
+---
+
+## 当前版本的功能边界
+
+### 已实现
+
+- Windows 桌面悬浮窗口
+- 主屏幕截图
+- 全局热键触发截图分析
+- 模型配置读取与本地保存
+- 本地知识库导入与检索
+- 基于截图 + 知识库的回合建议生成
+- Wiki 图鉴抓取与结构化导出
+- GitHub Release 自动化发布
+
+### 暂未实现
+
+- 自动代打 / 自动点击 / 自动操作游戏
+- 持续监控整场战斗
+- 视频流连续识别
+- PDF / Word 资料导入
+- 高级语义向量检索
+- 跨平台截图与热键支持（当前以 Windows 为主）
+
+---
+
+## 项目工作流
+
+程序的核心流程如下：
+
+1. 用户按热键或点击“截图并分析”
+2. 程序截取当前主屏幕并保存截图
+3. 把截图发给多模态模型识别战局
+4. 根据战局字段构造检索词
+5. 在本地 SQLite 知识库中搜索命中资料
+6. 将战局 + 资料命中交给模型生成建议
+7. 在界面中显示：
+   - 战局识别结果
+   - 推荐操作
+   - 资料依据
+
+---
+
+## 环境要求
+
+建议环境：
+
+- Windows 10 / 11
+- Python `>= 3.13`
+- [uv](https://docs.astral.sh/uv/)（推荐）
+- 可用的多模态模型 API
+
+---
+
+## 安装与启动
+
+### 1. 克隆仓库
+
+```bash
+git clone <your-repo-url>
+cd rock-kingdom-ai-battle-assistant-system
 ```
 
-输出：
+### 2. 安装依赖
+
+```bash
+uv sync
+```
+
+### 3. 准备配置文件
+
+仓库提交的是示例配置文件 `config.example.toml`。  
+首次运行前请复制为本地配置文件：
+
+#### PowerShell
+
+```powershell
+Copy-Item config.example.toml config.toml
+```
+
+#### Bash
+
+```bash
+cp config.example.toml config.toml
+```
+
+### 4. 修改配置
+
+请按你自己的模型环境调整 `config.toml`，主要字段包括：
+
+- `model_provider`
+- `model`
+- `review_model`
+- `model_reasoning_effort`
+- `disable_response_storage`
+- `network_access`
+- `model_context_window`
+- `model_auto_compact_token_limit`
+- `model_providers.<ProviderName>.base_url`
+- `model_providers.<ProviderName>.wire_api`
+- `model_providers.<ProviderName>.requires_openai_auth`
+
+> 程序会优先读取 `config.toml`。  
+> 如果它不存在，则回退读取 `config.example.toml`。
+
+### 5. 启动应用
+
+```bash
+uv run ailock
+```
+
+---
+
+## 使用教程
+
+下面是按当前版本整理的推荐使用流程。
+
+### 第一步：启动后先检查模型设置
+
+启动应用后，界面左上区域会显示模型相关表单。  
+当前你可以在界面中直接调整：
+
+- API Key
+- Model
+- Base URL
+- 全局热键
+- 资料命中数
+
+建议先完成以下动作：
+
+1. 填入 API Key
+2. 检查 Model 是否正确
+3. 检查 Base URL 是否正确
+4. 点击“保存设置”
+
+设置会保存在本地 `data/settings.json` 中。
+
+### 第二步：准备知识库资料
+
+你有两种方式准备知识库。
+
+#### 方式 A：直接使用仓库自带公开数据
+
+当前仓库已经包含公开可分发的数据集，可以直接用来检索。
+
+#### 方式 B：导入你自己的资料
+
+点击界面中的 **“导入资料文件夹”**，选择一个本地文件夹。  
+程序会递归读取该目录下支持的资料文件。
+
+支持格式：
+
+- 文本：`.txt`、`.md`
+- 图片：`.png`、`.jpg`、`.jpeg`、`.webp`、`.bmp`
+
+导入完成后，资料会写入本地知识库。
+
+### 第三步：开始截图分析
+
+你可以通过两种方式触发分析：
+
+- 点击按钮：**截图并分析**
+- 使用全局热键：默认 `Ctrl+Shift+A`
+
+触发后程序会自动完成：
+
+1. 截图
+2. 战局识别
+3. 本地知识检索
+4. 回合建议生成
+
+### 第四步：阅读结果
+
+界面会显示三个主要结果区域：
+
+#### 1. 战局识别
+
+这里会显示：
+
+- 当前识别状态
+- 战术总结
+- 我方信息
+- 对方信息
+- 节奏/场地信息
+- 识别疑点
+- 截图存档位置
+
+#### 2. 推荐操作
+
+这里会显示：
+
+- 推荐操作
+- 原因
+- 置信度
+- 注意事项
+
+#### 3. 资料依据
+
+这里会显示本次建议命中的本地资料摘要。  
+如果没有命中，会明确提示未命中本地资料。
+
+---
+
+## 如何抓取最新图鉴数据
+
+如果你想刷新仓库中的图鉴数据，可运行：
+
+```bash
+uv run python scripts/fetch_rocom_wiki.py
+```
+
+它会抓取 BiliGame Wiki 中可见的结构化图鉴信息，并更新：
 
 - `data/rocom_wiki/pets.json`
 - `data/rocom_wiki/pets.csv`
 - `data/rocom_wiki/skills.json`
 - `data/rocom_wiki/skills.csv`
 - `data/rocom_wiki/manifest.json`
-- 同时写入 `data/knowledge.db`，供 AI洛克检索使用
+- `data/knowledge.db`
 
-数据来源采用 BiliGame Wiki 页面中可见的图鉴索引字段；不复制文章正文。
+### 可选参数
 
-默认会继续进入每个精灵/技能详情页补充结构化字段：
-
-- 技能：属性、类型（物攻/魔攻/状态等）、耗能、威力/伤害、效果、可学习精灵
-- 精灵：种族值总分、生命/物攻/魔攻/物防/魔防/速度分项、特性、精灵技能、血脉技能、可学技能石
-
-导出的 `pets.json/csv` 与 `skills.json/csv` 默认只保留结构化内容，不再保存页面链接、图片链接等 URL 字段。
-
-调试时可限制详情页数量：
-
-```powershell
-uv run python scripts\fetch_rocom_wiki.py --detail-limit 3 --skip-db
-```
-
-如只想保留旧版索引卡片抓取速度：
-
-```powershell
-uv run python scripts\fetch_rocom_wiki.py --skip-detail-pages
-```
-
-## 快速开始
-
-### 1. 安装依赖
-
-```powershell
-uv sync
-```
-
-### 2. 准备项目配置
-
-公开仓库中提交的是 `config.example.toml`。首次运行前请先复制一份本地配置：
-
-```powershell
-Copy-Item config.example.toml config.toml
-```
-
-或在类 Unix shell 中：
+#### 只抓取少量详情页用于调试
 
 ```bash
-cp config.example.toml config.toml
+uv run python scripts/fetch_rocom_wiki.py --detail-limit 3 --skip-db
 ```
 
-然后根据你自己的环境填写或调整：
+#### 跳过详情页，只保留较快的索引抓取
 
-- 模型服务商
-- API Base URL
-- 模型名
-- 是否需要 OpenAI 兼容认证
-- 其他运行参数
+```bash
+uv run python scripts/fetch_rocom_wiki.py --skip-detail-pages
+```
 
-### 3. 启动应用
+---
+
+## 打包发布
+
+当前仓库提供了 PowerShell 打包脚本：
 
 ```powershell
-uv run ailock
+./scripts/build_release.ps1
 ```
 
-### 4. 在界面中填写
+它会完成：
 
-- API Key
-- Model / Base URL 默认从项目根目录 `config.toml` 读取；如果缺失，则回退到 `config.example.toml`
-- 热键（默认 `Ctrl+Shift+A`）：点击“修改热键”，直接按下想用的组合键，再确认保存。
+1. 安装依赖
+2. 运行测试
+3. 使用 PyInstaller 构建桌面可执行包
+4. 生成发布目录
+5. 打包为 zip
 
-### 5. 导入资料
+> 说明：打包脚本当前主要面向 Windows 使用场景。
 
-点击“导入资料文件夹”，选择你保存攻略截图/复制文本的文件夹。
+---
 
-### 6. 使用
+## 目录说明
 
-- 按热键或点击“截图并分析”
-- 应用会：
-  1. 截图
-  2. 将截图发送给大模型识别当前战局
-  3. 从本地资料库检索相关内容
-  4. 再次调用模型给出推荐操作
-
-## 目录结构
+### 核心源码
 
 ```text
 src/ailock/
-  app.py
-  ui.py
-  hotkey.py
-  capture.py
-  knowledge.py
-  llm_client.py
-  advisor.py
-  models.py
-  config.py
+  app.py          # 程序入口
+  ui.py           # Qt 图形界面
+  hotkey.py       # Windows 全局热键
+  capture.py      # 主屏幕截图
+  knowledge.py    # 本地知识库导入/检索
+  llm_client.py   # 多模态模型请求与解析
+  advisor.py      # 截图分析总流程编排
+  models.py       # 数据结构定义
+  config.py       # 配置读取与路径管理
 ```
 
-## 仓库内公开数据与本地私有数据
+### 脚本
 
-当前公开仓库会保留可分发的数据资产，例如：
+```text
+scripts/
+  ailock_entry.py        # 打包入口
+  build_release.ps1      # Windows 打包脚本
+  fetch_rocom_wiki.py    # Wiki 图鉴抓取
+  test_image_answer.py   # 截图/模型链路调试脚本
+```
 
+### 测试
+
+```text
+tests/
+  test_config.py
+  test_fetch_rocom_wiki.py
+  test_knowledge.py
+  test_llm_client.py
+```
+
+### 数据目录
+
+```text
+data/
+  knowledge.db
+  rocom_wiki/
+  rocom_wiki_smoke/
+  rocom_wiki_smoke_db/
+  debug_pages/
+  captures/          # 本地截图存档（不提交）
+  knowledge/         # 本地私有资料（不提交）
+  settings.json      # 本地设置（不提交）
+```
+
+---
+
+## 仓库中哪些数据会公开，哪些不会
+
+### 会公开提交
+
+- `data/knowledge.db`
 - `data/rocom_wiki/`
 - `data/rocom_wiki_smoke/`
 - `data/rocom_wiki_smoke_db/`
-- `data/knowledge.db`
 - `data/debug_pages/`
 - `data/*_page_sample.html`
 
-以下本地运行数据不会提交：
+### 不会提交
 
 - `data/settings.json`
 - `data/captures/`
@@ -144,49 +411,87 @@ src/ailock/
 - `.venv/`
 - `.omx/`
 - `.tmp-tests/`
+- 本地私有 API Key
 
-## 版本与 GitHub Release
+---
 
-本项目采用 **SemVer（语义化版本）** 管理 GitHub Release：
+## 版本与发布
 
-- 首个公开版本通常从 `v0.1.0` 开始
-- `v0.1.x`：只修复 bug，不改公开接口预期
-- `v0.2.0`：新增功能，但仍处于 0.x 快速迭代阶段
-- `v1.0.0`：功能和使用方式基本稳定后再进入正式稳定版
+本项目使用 **SemVer（语义化版本）**：
 
-版本维护建议：
+- `0.1.0`：首个公开版本
+- `0.1.x`：补丁修复
+- `0.2.0`：新增功能但仍处于快速迭代期
+- `1.0.0`：功能稳定后的正式版本
+
+版本规则：
 
 - `pyproject.toml` 使用不带 `v` 的版本号，例如 `0.1.0`
 - Git tag / GitHub Release 使用带 `v` 的标签，例如 `v0.1.0`
 - 发布说明维护在 `CHANGELOG.md`
-- 实际当前版本以 `pyproject.toml`、Git tag 和 `CHANGELOG.md` 为准
 
-## 自动 Release
+---
+
+## 自动 GitHub Release
 
 仓库内置 GitHub Actions 自动发布流程：
 
-- 当你 push 一个符合 `v*` 规则的 tag（例如 `v0.1.1`）时
-- workflow 会自动读取对应的 `CHANGELOG.md` 小节
-- 然后创建或更新同名 GitHub Release
+- 当 push 一个 `v*` tag（如 `v0.1.1`）时
+- workflow 会读取 `CHANGELOG.md`
+- 自动创建或更新同名 GitHub Release
 
-典型发布流程：
+典型发版流程：
 
-1. 更新 `pyproject.toml` 版本号
-2. 更新 `CHANGELOG.md`
-3. 提交代码
-4. 创建 tag，例如：
+```bash
+# 1. 更新版本号与 changelog
 
-   ```bash
-   git tag -a v0.1.1 -m "release v0.1.1"
-   git push origin master
-   git push origin v0.1.1
-   ```
+# 2. 提交代码
+git add .
+git commit -m "release prep v0.1.1"
 
-这样就会自动生成或更新对应的 GitHub Release。
+# 3. 推送主分支
+git push origin master
 
-## 已知边界
+# 4. 创建并推送 tag
+git tag -a v0.1.1 -m "release v0.1.1"
+git push origin v0.1.1
+```
 
-- 当前默认兼容 **OpenAI Responses 风格** 多模态接口
-- 暂未实现自动操作、代打、持续监控
-- 暂未实现 PDF / Word 资料导入
-- 当前检索为轻量关键词匹配，适合 v1 验证
+---
+
+## 已知限制
+
+- 当前以 Windows 桌面环境为主
+- 目前默认依赖兼容 OpenAI 风格的多模态接口
+- 截图识别质量受截图清晰度、UI遮挡、模型能力影响
+- 本地知识检索当前仍是轻量关键词匹配，不是向量语义检索
+- 当前不负责自动执行游戏操作，只提供辅助判断
+
+---
+
+## 测试
+
+运行全部单元测试：
+
+```bash
+uv run python -m unittest discover -s tests -v
+```
+
+---
+
+## 适合谁使用
+
+这个项目更适合以下场景：
+
+- 想做 **洛克王国 PVP 回合辅助**
+- 想把自己的攻略资料整理成可检索知识库
+- 想验证“截图识别 + 本地知识 + 大模型建议”的工作流
+- 想在 Windows 本地桌面环境中快速迭代这类工具
+
+如果你想做的是：
+
+- 全自动代打
+- 全流程托管操作
+- 长时间后台监控整局对战
+
+那当前版本还不是这个方向。
