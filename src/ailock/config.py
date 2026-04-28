@@ -16,6 +16,7 @@ class ProjectPaths:
     data_dir: Path
     captures_dir: Path
     knowledge_dir: Path
+    logs_dir: Path
     database_path: Path
     settings_path: Path
     config_path: Path
@@ -29,11 +30,13 @@ class ProjectPaths:
         data_dir = root / "data"
         captures_dir = data_dir / "captures"
         knowledge_dir = data_dir / "knowledge"
+        logs_dir = data_dir / "logs"
         return cls(
             root=root,
             data_dir=data_dir,
             captures_dir=captures_dir,
             knowledge_dir=knowledge_dir,
+            logs_dir=logs_dir,
             database_path=data_dir / "knowledge.db",
             settings_path=data_dir / "settings.json",
             config_path=root / "config.toml",
@@ -43,6 +46,7 @@ class ProjectPaths:
         self.data_dir.mkdir(exist_ok=True)
         self.captures_dir.mkdir(exist_ok=True)
         self.knowledge_dir.mkdir(exist_ok=True)
+        self.logs_dir.mkdir(exist_ok=True)
 
 
 class SettingsStore:
