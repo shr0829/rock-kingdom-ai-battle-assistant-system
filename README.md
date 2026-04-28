@@ -280,6 +280,42 @@ fix(模块): 避免……
 
 第一行仍然优先表达“为什么要改”，不要只写“修复 bug”“优化一下”“更新”这类模糊描述。
 
+## 协作与合并策略（统一采用 Squash Merge）
+
+仓库默认采用 **feature 分支开发 + Pull Request 审查 + Squash Merge 合入主线**。
+
+### 约定
+
+- 日常开发从 `master` 拉出功能分支，例如 `feature/timing-log`、`fix/config-fallback`。
+- 功能开发过程中可以有多个本地提交，但合入 `master` 时统一使用 **Squash Merge**。
+- 合入后的主线只保留 **一个代表本次 PR 意图的提交**，避免把 `wip`、`fix typo`、`调试` 一类噪声提交带进主线。
+- Squash 后生成的提交说明继续沿用本仓库的中文 commit 模板：**第一行写为什么要改，正文写背景、取舍、风险和验证**。
+
+### 推荐流程
+
+```bash
+git checkout master
+git pull --ff-only origin master
+
+git checkout -b feature/xxx
+# 开发、提交、推送
+git push -u origin feature/xxx
+```
+
+然后通过 GitHub Pull Request 合并，并在仓库设置中只保留 **Squash merge**。
+
+### 为什么选 Squash Merge
+
+- 主线历史更干净，便于按“一个需求 / 一个修复”阅读。
+- 回滚时更直接，通常只需要回滚一个 squash 后的主线提交。
+- 不要求每个开发中的中间提交都绝对完美，但要求最终合入主线的提交说明清晰、可审计。
+
+### 注意事项
+
+- 如果一个分支上混入了多个不相关改动，Squash 也只能把它们压成一个更大的混合提交；因此仍然要保持 **一个分支只做一件事**。
+- PR 标题建议直接按最终主线提交来写，因为 Squash Merge 时通常会复用或参考 PR 标题。
+- 如果确实需要保留完整分支拓扑（例如大规模迁移、多人并行子任务的审计场景），需要单独说明，不作为默认策略。
+
 ## 打包发布
 
 Windows 本地打包：
