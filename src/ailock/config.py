@@ -55,8 +55,9 @@ class SettingsStore:
         if self.path.exists():
             user_payload = json.loads(self.path.read_text(encoding="utf-8"))
             settings = AppSettings(**{**settings.to_dict(), **user_payload})
-        if self.config_path is not None and self.config_path.exists():
-            settings = self._apply_project_config(settings, self._load_toml(self.config_path))
+        project_config_path = self._resolve_project_config_path()
+        if project_config_path is not None:
+            settings = self._apply_project_config(settings, self._load_toml(project_config_path))
         if not settings.api_key.strip():
             settings = AppSettings(**{**settings.to_dict(), "api_key": self._load_codex_auth_key()})
         return settings
@@ -71,6 +72,18 @@ class SettingsStore:
     def _load_toml(path: Path) -> dict[str, Any]:
         with path.open("rb") as file:
             return tomllib.load(file)
+
+    def _resolve_project_config_path(self) -> Path | None:
+        if self.config_path is None:
+            return None
+        if self.config_path.exists():
+            return self.config_path
+        with_name = getattr(self.config_path, "with_name", None)
+        if callable(with_name):
+            example_path = with_name("config.example.toml")
+            if example_path.exists():
+                return example_path
+        return None
 
     @staticmethod
     def _apply_project_config(settings: AppSettings, payload: dict[str, Any]) -> AppSettings:

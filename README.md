@@ -64,16 +64,24 @@ $env:UV_CACHE_DIR='E:\codex\backage\cache'
 uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-### 2. 启动应用
+### 2. 准备项目配置
+
+公开仓库中提交的是 `config.example.toml`。首次运行前请先复制一份本地配置：
+
+```powershell
+Copy-Item config.example.toml config.toml
+```
+
+### 3. 启动应用
 
 ```powershell
 uv run ailock
 ```
 
-### 3. 在界面中填写
+### 4. 在界面中填写
 
 - API Key
-- Model / Base URL 默认从项目根目录 `config.toml` 读取
+- Model / Base URL 默认从项目根目录 `config.toml` 读取；如果缺失，则回退到 `config.example.toml`
 - 热键（默认 `Ctrl+Shift+A`）：点击“修改热键”，直接按下想用的组合键，再确认保存。
 
 当前项目配置：
@@ -91,11 +99,11 @@ wire_api = "responses"
 requires_openai_auth = true
 ```
 
-### 4. 导入资料
+### 5. 导入资料
 
 点击“导入资料文件夹”，选择你保存攻略截图/复制文本的文件夹。
 
-### 5. 使用
+### 6. 使用
 
 - 按热键或点击“截图并分析”
 - 应用会：
@@ -118,6 +126,41 @@ src/ailock/
   models.py
   config.py
 ```
+
+## 仓库内公开数据与本地私有数据
+
+当前公开仓库会保留可分发的数据资产，例如：
+
+- `data/rocom_wiki/`
+- `data/rocom_wiki_smoke/`
+- `data/rocom_wiki_smoke_db/`
+- `data/knowledge.db`
+- `data/debug_pages/`
+- `data/*_page_sample.html`
+
+以下本地运行数据不会提交：
+
+- `data/settings.json`
+- `data/captures/`
+- `data/knowledge/`
+- `.venv/`
+- `.omx/`
+- `.tmp-tests/`
+
+## 版本与 GitHub Release
+
+本项目采用 **SemVer（语义化版本）** 管理 GitHub Release：
+
+- `v0.1.0`：首个公开可用版本（当前版本）
+- `v0.1.x`：只修复 bug，不改公开接口预期
+- `v0.2.0`：新增功能，但仍处于 0.x 快速迭代阶段
+- `v1.0.0`：功能和使用方式基本稳定后再进入正式稳定版
+
+当前建议：
+
+- `pyproject.toml` 保持 `0.1.0`
+- Git tag / GitHub Release 使用 `v0.1.0`
+- 发布说明维护在 `CHANGELOG.md`
 
 ## 已知边界
 

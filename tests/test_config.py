@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 from ailock.config import SettingsStore
@@ -45,6 +47,32 @@ class ConfigTests(unittest.TestCase):
             settings = SettingsStore(settings_path).load()
 
         self.assertEqual(settings.api_key, "fallback-secret")
+
+    def test_example_config_is_used_when_main_config_is_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            settings_path = root / "settings.json"
+            config_path = root / "config.toml"
+            example_path = root / "config.example.toml"
+            example_path.write_text(
+                "\n".join(
+                    [
+                        'model = "gpt-5.5"',
+                        "",
+                        "[model_providers.OpenAI]",
+                        'base_url = "https://api.asxs.top/v1"',
+                        'wire_api = "responses"',
+                        "requires_openai_auth = true",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            settings = SettingsStore(settings_path, config_path).load()
+
+        self.assertEqual(settings.model, "gpt-5.5")
+        self.assertEqual(settings.base_url, "https://api.asxs.top/v1")
+        self.assertEqual(settings.wire_api, "responses")
 
 
 if __name__ == "__main__":
