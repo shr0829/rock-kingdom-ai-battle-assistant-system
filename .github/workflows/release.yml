@@ -1,0 +1,63 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build release notes from changelog
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          changelog = pathlib.Path("CHANGELOG.md")
+          notes = f"Automated release for {tag}."
+
+          if changelog.exists():
+              text = changelog.read_text(encoding="utf-8")
+              pattern = rf"^##\s+{re.escape(tag)}(?:\s*-\s*.*)?\n(.*?)(?=^##\s+|\Z)"
+              match = re.search(pattern, text, flags=re.MULTILINE | re.DOTALL)
+              if match:
+                  extracted = match.group(1).strip()
+                  if extracted:
+                      notes = extracted
+
+          pathlib.Path("release-notes.md").write_text(notes + "\n", encoding="utf-8")
+          PY
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --repo "$REPOSITORY" \
+              --title "$TAG" \
+              --notes-file release-notes.md
+          else
+            gh release create "$TAG" \
+              --repo "$REPOSITORY" \
+              --title "$TAG" \
+              --notes-file release-notes.md
+          fi
