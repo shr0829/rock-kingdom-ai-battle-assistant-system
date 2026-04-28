@@ -233,6 +233,53 @@ data/
 uv run python -m unittest discover -s tests -v
 ```
 
+## 提交规范（默认中文）
+
+仓库现在内置了中文 commit 模板和提交校验，目标是让每次提交都先说清楚“为什么要改”，再补充背景、取舍、风险和验证。
+
+### 一次性启用本地 Git 约定
+
+```bash
+uv run python scripts/setup_git_conventions.py
+```
+
+这条命令会为当前仓库设置：
+
+- `commit.template = .gitmessage-zh-CN.txt`
+- `core.hooksPath = .githooks`
+- `i18n.commitEncoding = utf-8`
+- `i18n.logOutputEncoding = utf-8`
+
+启用后：
+
+- 默认 `git commit` 会带出中文模板。
+- `git commit -m ...` 如果没写正文、尾注或不是中文意图句，会被 `.githooks/commit-msg` 拦下。
+- 常规提交建议优先直接运行 `git commit`，在编辑器里按模板填写。
+
+### 提交模板
+
+```text
+<一句话说明本次提交的意图>
+
+<补充说明：问题背景、修改思路、影响范围、为什么这样做。>
+
+约束: <这次修改受什么外部条件限制>
+备选方案: <考虑过但没采用的方案> | <放弃原因>
+信心: <低|中|高>
+风险范围: <小|中|大>
+提醒: <给以后维护者的注意事项>
+已验证: <做了哪些测试或检查>
+未验证: <还有哪些没覆盖到>
+```
+
+如果团队同时使用 Conventional Commits，建议写成：
+
+```text
+fix(模块): 避免……
+```
+
+第一行仍然优先表达“为什么要改”，不要只写“修复 bug”“优化一下”“更新”这类模糊描述。
+
 ## 打包发布
 
 Windows 本地打包：
@@ -253,7 +300,7 @@ GitHub Release 自动发布：
 
 ```bash
 git add .
-git commit -m "Prepare release v0.1.1"
+git commit
 git push origin master
 
 git tag -a v0.1.1 -m "release v0.1.1"
