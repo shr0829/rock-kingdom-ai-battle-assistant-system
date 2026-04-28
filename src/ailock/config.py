@@ -57,6 +57,8 @@ class SettingsStore:
             settings = AppSettings(**{**settings.to_dict(), **user_payload})
         if self.config_path is not None and self.config_path.exists():
             settings = self._apply_project_config(settings, self._load_toml(self.config_path))
+        if not settings.api_key.strip():
+            settings = AppSettings(**{**settings.to_dict(), "api_key": self._load_codex_auth_key()})
         return settings
 
     def save(self, settings: AppSettings) -> None:
@@ -98,3 +100,14 @@ class SettingsStore:
                 values["requires_openai_auth"],
             )
         return AppSettings(**values)
+
+    @staticmethod
+    def _load_codex_auth_key() -> str:
+        auth_path = Path.home() / ".codex" / "auth.json"
+        if not auth_path.exists():
+            return ""
+        try:
+            payload = json.loads(auth_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return ""
+        return str(payload.get("OPENAI_API_KEY", "")).strip()

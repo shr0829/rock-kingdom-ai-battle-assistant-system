@@ -341,17 +341,30 @@ class MainWindow(QMainWindow):
         battle_state = result.battle_state
         advice = result.advice
         knowledge_text = "\n\n".join(f"{item.title}\n{item.content}" for item in result.knowledge_hits) or "未命中本地资料。"
+        key_notes = battle_state.field_notes[:3] or ["未识别到明显节奏信息"]
+        unknowns = battle_state.unknowns[:3] or ["无"]
+        state_quality = "信息不足，建议补截图" if not battle_state.player_pet and not battle_state.visible_moves else "已提取到关键战局信息"
         self.state_output.setPlainText(
             "\n".join(
                 [
-                    f"我方宠物: {battle_state.player_pet or '未知'}",
-                    f"对方宠物: {battle_state.opponent_pet or '未知'}",
-                    f"我方血量: {battle_state.player_hp_state or '未知'}",
-                    f"对方血量: {battle_state.opponent_hp_state or '未知'}",
-                    f"可见技能: {', '.join(battle_state.visible_moves) or '无'}",
-                    f"状态效果: {', '.join(battle_state.status_effects) or '无'}",
-                    f"场面备注: {', '.join(battle_state.field_notes) or '无'}",
-                    f"识别疑点: {', '.join(battle_state.unknowns) or '无'}",
+                    "[作战摘要]",
+                    f"识别状态: {state_quality}",
+                    f"战术总结: {battle_state.tactical_summary or '暂无稳定结论'}",
+                    "",
+                    "[我方信息]",
+                    f"我方精灵: {battle_state.player_pet or '未稳定识别'}",
+                    f"我方血量: {battle_state.player_hp_state or '未稳定识别'}",
+                    f"可见技能: {', '.join(battle_state.visible_moves) or '未识别到'}",
+                    f"状态效果: {', '.join(battle_state.status_effects) or '未识别到'}",
+                    "",
+                    "[对局对象]",
+                    f"对方精灵: {battle_state.opponent_pet or '未稳定识别'}",
+                    "",
+                    "[节奏与场面]",
+                    f"关键信息: {'；'.join(key_notes)}",
+                    "",
+                    "[待确认]",
+                    f"识别疑点: {'；'.join(unknowns)}",
                     f"截图存档: {result.screenshot_path}",
                 ]
             )

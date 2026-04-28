@@ -32,7 +32,6 @@ class BattleState:
     player_pet: str = ""
     opponent_pet: str = ""
     player_hp_state: str = ""
-    opponent_hp_state: str = ""
     visible_moves: list[str] = field(default_factory=list)
     status_effects: list[str] = field(default_factory=list)
     field_notes: list[str] = field(default_factory=list)
