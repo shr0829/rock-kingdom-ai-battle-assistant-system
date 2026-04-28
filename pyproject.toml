@@ -11,6 +11,11 @@ dependencies = [
     "PySide6-Essentials>=6.10.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/shr0829/rock-kingdom-ai-battle-assistant-system"
+Repository = "https://github.com/shr0829/rock-kingdom-ai-battle-assistant-system"
+Issues = "https://github.com/shr0829/rock-kingdom-ai-battle-assistant-system/issues"
+
 [project.scripts]
 ailock = "ailock:main"
 

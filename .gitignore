@@ -11,9 +11,14 @@ wheels/
 # Virtual environments
 .venv
 
-# Runtime/user data
-data/
+# Local/private config
+config.toml
+
+# Local runtime/user data
 data/settings.json
-data/knowledge.db
 data/captures/
 data/knowledge/
+
+# Local tooling state
+.omx/
+.tmp-tests/
