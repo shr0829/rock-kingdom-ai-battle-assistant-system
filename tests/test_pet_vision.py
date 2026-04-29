@@ -143,6 +143,35 @@ class PetVisionTests(unittest.TestCase):
             self.assertTrue(all(row[1] > 0 for row in rows))
             self.assertTrue(all("width" in row[2] for row in rows))
 
+    def test_confirmation_accepts_user_typed_pet_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            service = PetVisionService(data_dir=root / "data", database_path=root / "data" / "knowledge.db")
+            pet_a = service.catalog.upsert(name="迪莫")
+            artwork = root / "data" / "pet_vision" / "artworks" / "迪莫.png"
+            artwork.parent.mkdir(parents=True, exist_ok=True)
+            write_image(artwork, QColor("blue"))
+            service.samples.upsert_artwork(
+                pet_id=pet_a,
+                name="迪莫",
+                source_url="https://example.invalid/dimo.png",
+                local_path=str(artwork),
+                image_bytes=artwork.read_bytes(),
+            )
+            service.index_store.rebuild_index()
+            screenshot = root / "capture.png"
+            write_image(screenshot, QColor("blue"), width=200, height=100)
+            result = service.recognize_screenshot(screenshot)
+
+            service.save_confirmation(
+                result,
+                player_name="玩家手输新宠",
+                opponent_name="喵喵",
+            )
+
+            self.assertEqual(service.catalog.find_by_name("玩家手输新宠").source, "user_confirmation")  # type: ignore[union-attr]
+            self.assertIsNotNone(service.catalog.find_by_name("喵喵"))
+
 
 if __name__ == "__main__":
     unittest.main()

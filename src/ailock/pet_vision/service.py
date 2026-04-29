@@ -40,13 +40,8 @@ class PetVisionService:
         player_name: str,
         opponent_name: str,
     ) -> tuple[int, list[int]]:
-        player = self.catalog.find_by_name(player_name)
-        opponent = self.catalog.find_by_name(opponent_name)
-        missing = [name for name, entry in ((player_name, player), (opponent_name, opponent)) if entry is None]
-        if missing:
-            raise ValueError(f"确认入库前必须选择数据库内的标准宠物名：{', '.join(missing)}")
-        assert player is not None
-        assert opponent is not None
+        player = self._get_or_create_confirmed_entry(player_name)
+        opponent = self._get_or_create_confirmed_entry(opponent_name)
         event_id = self.samples.create_event(result)
         sample_ids = [
             self.samples.save_confirmed_sample(
@@ -67,6 +62,19 @@ class PetVisionService:
 
     def list_catalog_names(self, limit: int = 2000) -> list[str]:
         return self.catalog.list_names(limit=limit)
+
+    def _get_or_create_confirmed_entry(self, name: str):
+        cleaned = name.strip()
+        if not cleaned:
+            raise ValueError("确认入库前必须填写宠物名。")
+        existing = self.catalog.find_by_name(cleaned)
+        if existing is not None:
+            return existing
+        pet_id = self.catalog.upsert(name=cleaned, aliases=[cleaned], source="user_confirmation")
+        created = self.catalog.find_by_name(cleaned)
+        if created is None:
+            raise RuntimeError(f"保存玩家输入宠物名失败：{cleaned}")
+        return created
 
     def _normalize_result(self, result: PetRecognitionResult) -> PetRecognitionResult:
         if not result.name:

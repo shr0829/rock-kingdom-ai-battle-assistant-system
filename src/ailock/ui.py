@@ -162,7 +162,7 @@ class MainWindow(QMainWindow):
         header = QLabel("AI洛克")
         header.setFont(QFont("Microsoft YaHei UI", 22, QFont.Weight.Bold))
         header.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        subheader = QLabel("点击开始后自动截图、识别双方宠物并生成建议")
+        subheader = QLabel("点击开始后自动截图并识别双方宠物，先确认样本再优化识别")
         subheader.setWordWrap(True)
         subheader.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
@@ -191,19 +191,19 @@ class MainWindow(QMainWindow):
         self.detail_toggle_button.toggled.connect(self._toggle_detail_panel)
         layout.addWidget(self.detail_toggle_button)
 
-        self.detail_panel = QGroupBox("确认与建议")
+        self.detail_panel = QGroupBox("确认与样本保存")
         self.detail_panel.setObjectName("detailPanel")
         self.detail_panel.setVisible(False)
         detail_layout = QVBoxLayout(self.detail_panel)
         self.state_output = QPlainTextEdit()
         self.state_output.setReadOnly(True)
-        pet_confirm_box = QGroupBox("宠物识别确认")
+        pet_confirm_box = QGroupBox("宠物识别确认（不对就直接输入正确名字）")
         pet_confirm_layout = QFormLayout(pet_confirm_box)
         self.player_pet_combo = QComboBox()
         self.player_pet_combo.setEditable(True)
         self.opponent_pet_combo = QComboBox()
         self.opponent_pet_combo.setEditable(True)
-        self.confirm_pet_button = QPushButton("保存确认样本")
+        self.confirm_pet_button = QPushButton("确认无误并保存样本")
         self.confirm_pet_button.setDisabled(True)
         self.confirm_pet_button.clicked.connect(self.confirm_pet_samples)
         pet_confirm_layout.addRow("我方宠物", self.player_pet_combo)
@@ -214,7 +214,7 @@ class MainWindow(QMainWindow):
         self.evidence_output = QPlainTextEdit()
         self.evidence_output.setReadOnly(True)
         detail_layout.addWidget(pet_confirm_box)
-        detail_layout.addWidget(QLabel("建议"))
+        detail_layout.addWidget(QLabel("当前阶段"))
         detail_layout.addWidget(self.advice_output, 2)
         detail_layout.addWidget(QLabel("识别详情"))
         detail_layout.addWidget(self.state_output, 2)
@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
         self.detail_toggle_button.setDisabled(True)
         self.detail_toggle_button.setChecked(False)
         self.detail_toggle_button.setText("正在识别，请稍候…")
-        self._set_busy(True, "正在截图并请求模型分析…")
+        self._set_busy(True, "正在截图并识别双方宠物…")
         worker = FunctionWorker(self.advisor.capture_and_advise)
         worker.signals.finished.connect(self._handle_analysis_result)
         worker.signals.failed.connect(self._handle_worker_error)
@@ -339,7 +339,10 @@ class MainWindow(QMainWindow):
         self.last_analysis_result = result
         battle_state = result.battle_state
         advice = result.advice
-        knowledge_text = "\n\n".join(f"{item.title}\n{item.content}" for item in result.knowledge_hits) or "未命中本地资料。"
+        knowledge_text = (
+            "\n\n".join(f"{item.title}\n{item.content}" for item in result.knowledge_hits)
+            or "当前阶段已跳过资料检索和建议生成；请先确认或修正宠物名并保存样本。"
+        )
         key_notes = battle_state.field_notes[:3] or ["未识别到明显节奏信息"]
         unknowns = battle_state.unknowns[:3] or ["无"]
         state_quality = "信息不足，建议补截图" if not battle_state.player_pet and not battle_state.visible_moves else "已提取到关键战局信息"
@@ -348,7 +351,7 @@ class MainWindow(QMainWindow):
                 [
                     "[作战摘要]",
                     f"识别状态: {state_quality}",
-                    f"战术总结: {battle_state.tactical_summary or '暂无稳定结论'}",
+                    f"战术总结: {battle_state.tactical_summary or '当前阶段暂不生成'}",
                     "",
                     "[我方信息]",
                     f"我方精灵: {battle_state.player_pet or '未稳定识别'}",
@@ -382,7 +385,7 @@ class MainWindow(QMainWindow):
         self.evidence_output.setPlainText(knowledge_text)
         self._populate_pet_confirmation(result)
         self.detail_toggle_button.setDisabled(False)
-        self.detail_toggle_button.setText("识别完成 · 展开/收起确认和建议")
+        self.detail_toggle_button.setText("识别完成 · 展开确认/修正并保存样本")
         self.detail_toggle_button.setChecked(True)
         self._set_busy(False, "分析完成。")
 
@@ -393,7 +396,7 @@ class MainWindow(QMainWindow):
         player_name = self.player_pet_combo.currentText().strip()
         opponent_name = self.opponent_pet_combo.currentText().strip()
         if not player_name or not opponent_name:
-            QMessageBox.warning(self, "AI洛克", "请先选择我方和对方的标准宠物名。")
+            QMessageBox.warning(self, "AI洛克", "请先确认或输入我方和对方的正确宠物名。")
             return
         try:
             event_id, sample_ids = self.advisor.save_pet_confirmation(

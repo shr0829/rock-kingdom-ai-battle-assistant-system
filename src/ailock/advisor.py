@@ -5,7 +5,7 @@ from pathlib import Path
 from .capture import ScreenCaptureService
 from .knowledge import KnowledgeStore
 from .llm_client import MultimodalClient
-from .models import AnalysisResult, AppSettings, BattleState
+from .models import AdviceResult, AnalysisResult, AppSettings, BattleState
 from .pet_vision import PetVisionService
 from .pet_vision.types import DualPetRecognitionResult
 from .timing_log import AnalysisTimingLog
@@ -53,11 +53,36 @@ class AdvisorService:
                     artifact="pet_recognition",
                     result=pet_recognition.to_dict(),
                 )
+                with timing_log.step("build_battle_state_from_pet_recognition"):
+                    battle_state = self._battle_state_from_pet_recognition(pet_recognition)
+                with timing_log.step("skip_advice_until_pet_recognition_is_accurate"):
+                    advice = AdviceResult(
+                        recommended_action="暂不生成对战建议",
+                        reason="当前阶段先沉淀玩家确认样本，等双方宠物识别稳定后再接入建议生成。",
+                        confidence="not_applicable",
+                        caveats=["请先确认或修正双方宠物名称，并保存样本用于后续优化。"],
+                    )
+                    knowledge_hits = []
+                timing_log.write_event(
+                    "artifact",
+                    artifact="battle_state",
+                    query=battle_state.to_query(),
+                    unknown_count=len(battle_state.unknowns),
+                    confidence_map=battle_state.confidence_map,
+                )
+                timing_log.finish("ok", screenshot_path=str(screenshot_path))
+                return AnalysisResult(
+                    battle_state=battle_state,
+                    advice=advice,
+                    knowledge_hits=knowledge_hits,
+                    pet_recognition=pet_recognition,
+                    screenshot_path=str(screenshot_path),
+                    timing_log_path=str(timing_log.path),
+                    timing_events=timing_log.events,
+                )
 
             with timing_log.step("recognize_battle_state", image_bytes=len(image_bytes)):
                 battle_state = self.client.describe_battle_state(image_bytes)
-            if pet_recognition is not None:
-                battle_state = self._apply_pet_recognition(battle_state, pet_recognition)
             timing_log.write_event(
                 "artifact",
                 artifact="battle_state",
@@ -126,6 +151,10 @@ class AdvisorService:
         if self.pet_vision_service is None:
             return []
         return self.pet_vision_service.list_catalog_names(limit=limit)
+
+    @staticmethod
+    def _battle_state_from_pet_recognition(pet_recognition: DualPetRecognitionResult) -> BattleState:
+        return AdvisorService._apply_pet_recognition(BattleState(), pet_recognition)
 
     @staticmethod
     def _apply_pet_recognition(
