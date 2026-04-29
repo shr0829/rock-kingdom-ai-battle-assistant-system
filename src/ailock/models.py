@@ -22,6 +22,8 @@ class AppSettings:
     hotkey: str = "Ctrl+Shift+A"
     max_knowledge_hits: int = 5
     screenshot_detail: str = "high"
+    capture_window_title: str = "洛克王国"
+    capture_window_client_area: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -92,6 +94,7 @@ class AnalysisResult:
     battle_state: BattleState
     advice: AdviceResult
     knowledge_hits: list[KnowledgeEntry] = field(default_factory=list)
+    pet_recognition: Any | None = None
     screenshot_path: str = ""
     timing_log_path: str = ""
     timing_events: list[dict[str, Any]] = field(default_factory=list)

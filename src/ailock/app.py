@@ -8,6 +8,7 @@ from .advisor import AdvisorService
 from .capture import ScreenCaptureService
 from .config import ProjectPaths, SettingsStore
 from .knowledge import KnowledgeStore
+from .pet_vision import PetVisionService
 from .ui import MainWindow
 
 
@@ -23,9 +24,13 @@ def main() -> int:
     settings = settings_store.load()
     advisor = AdvisorService(
         settings=settings,
-        capture_service=ScreenCaptureService(paths.captures_dir),
+        capture_service=ScreenCaptureService(paths.captures_dir, settings),
         knowledge_store=KnowledgeStore(paths.database_path),
         log_dir=paths.logs_dir,
+        pet_vision_service=PetVisionService(
+            data_dir=paths.data_dir,
+            database_path=paths.database_path,
+        ),
     )
 
     window = MainWindow(settings=settings, advisor=advisor, settings_saver=settings_store.save)

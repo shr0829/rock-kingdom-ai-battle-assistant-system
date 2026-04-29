@@ -7,6 +7,8 @@ network_access = "enabled"
 windows_wsl_setup_acknowledged = true
 model_context_window = 400000
 model_auto_compact_token_limit = 360000
+capture_window_title = "洛克王国"
+capture_window_client_area = true
 
 [model_providers.OpenAI]
 name = "OpenAI"
