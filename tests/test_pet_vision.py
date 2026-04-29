@@ -62,6 +62,14 @@ class PetVisionTests(unittest.TestCase):
             self.assertEqual(store.find_by_name("圣光迪莫").name, "迪莫")  # type: ignore[union-attr]
             self.assertEqual(store.search("圣光")[0].name, "迪莫")
 
+    def test_catalog_prefers_exact_name_over_earlier_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = PetCatalogStore(Path(temp_dir) / "knowledge.db")
+            store.upsert(name="海豹战士", aliases=["海豹船长"])
+            exact_id = store.upsert(name="海豹船长")
+
+            self.assertEqual(store.find_by_name("海豹船长").id, exact_id)  # type: ignore[union-attr]
+
     def test_cropper_writes_player_and_opponent_crops(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

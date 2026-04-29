@@ -142,6 +142,7 @@ class PetCatalogStore:
         for row in rows:
             if self._normalize_text(row["name"]) == normalized:
                 return self._entry_from_row(row)
+        for row in rows:
             aliases = [self._normalize_text(alias) for alias in self._loads_aliases(row["aliases"])]
             if normalized in aliases:
                 return self._entry_from_row(row)
