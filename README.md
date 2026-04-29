@@ -69,7 +69,7 @@ uv sync
 Copy-Item config.example.toml config.toml
 ```
 
-`config.toml` 已被 `.gitignore` 忽略，用来保存本机模型网关配置。请至少检查这些字段：
+`config.example.toml` is the safe template committed to GitHub. Copy it to ignored `config.toml` for local gateway settings, then check at least these fields:
 
 ```toml
 model_provider = "OpenAI"
@@ -81,7 +81,7 @@ network_access = "enabled"
 
 [model_providers.OpenAI]
 name = "OpenAI"
-base_url = "https://api.asxs.top/v1"
+base_url = "https://api.openai.com/v1"
 wire_api = "responses"
 requires_openai_auth = true
 ```
@@ -100,7 +100,7 @@ uv run ailock
 - 全局热键
 - 本地资料命中数
 
-界面保存的用户设置会写入 `data/settings.json`，该文件不会提交到 Git。
+UI-saved user settings are written to ignored `data/settings.json`; do not put API keys in `config.example.toml`.
 
 ## 使用流程
 

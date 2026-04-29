@@ -1,17 +1,55 @@
+# AI Lock project configuration template
+#
+# Usage:
+#   Copy-Item config.example.toml config.toml
+#
+# Security rules:
+# - config.toml is ignored by Git and should contain only local machine settings.
+# - Do not put API keys in this template. The app stores UI-entered keys in
+#   data/settings.json, or falls back to OPENAI_API_KEY from ~/.codex/auth.json.
+# - If you use a private API gateway, replace base_url only in your local
+#   config.toml unless the gateway URL is intentionally public.
+
+# Active provider name. It must match a [model_providers.<name>] section below.
 model_provider = "OpenAI"
+
+# Model used for screenshot understanding and battle advice.
 model = "gpt-5.5"
+
+# Model used for review/lightweight follow-up tasks.
 review_model = "gpt-5.5"
+
+# Supported values depend on the selected model/gateway.
+# Common values: low, medium, high, xhigh.
 model_reasoning_effort = "xhigh"
+
+# Prefer disabling remote response storage for screenshots and battle context.
 disable_response_storage = true
+
+# Informational network-access flag displayed by the app/logs.
 network_access = "enabled"
+
+# Windows/WSL setup acknowledgement flag.
 windows_wsl_setup_acknowledged = true
+
+# Model context metadata used by local runtime settings.
 model_context_window = 400000
 model_auto_compact_token_limit = 360000
+
+# Window-title keyword for safe capture. By default, capture only the Rock Kingdom window.
 capture_window_title = "洛克王国"
+
+# true captures the client area, usually excluding title bar and borders.
 capture_window_client_area = true
 
 [model_providers.OpenAI]
 name = "OpenAI"
-base_url = "https://api.asxs.top/v1"
+
+# OpenAI-compatible API base URL. Use config.toml for private gateways.
+base_url = "https://api.openai.com/v1"
+
+# Current primary protocol.
 wire_api = "responses"
+
+# true means requests require a Bearer API key.
 requires_openai_auth = true
