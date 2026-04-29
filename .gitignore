@@ -23,3 +23,6 @@ data/logs/
 # Local tooling state
 .omx/
 .tmp-tests/
+
+# Local reference checkouts
+reference/
