@@ -102,6 +102,8 @@ class SettingsStore:
             "windows_wsl_setup_acknowledged",
             "model_context_window",
             "model_auto_compact_token_limit",
+            "capture_window_title",
+            "capture_window_client_area",
         ):
             if key in payload:
                 values[key] = payload[key]

@@ -25,6 +25,7 @@ class AdvisorService:
 
     def refresh_settings(self, settings: AppSettings) -> None:
         self.settings = settings
+        self.capture_service.refresh_settings(settings)
         self.client = MultimodalClient(settings)
 
     def capture_and_advise(self) -> AnalysisResult:
