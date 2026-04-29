@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from ailock.capture import ScreenCaptureService
+from ailock.capture import CaptureError, ScreenCaptureService
 from ailock.models import AppSettings
 
 
@@ -25,7 +25,7 @@ class CaptureServiceTests(unittest.TestCase):
         self.assertEqual(capture_window.call_args.kwargs["title_keyword"], "洛克王国")
         self.assertTrue(capture_window.call_args.kwargs["client_area"])
 
-    def test_blank_window_title_falls_back_to_primary_screen(self) -> None:
+    def test_blank_window_title_is_rejected_to_avoid_full_screen_capture(self) -> None:
         with TemporaryDirectory() as temp_dir:
             service = ScreenCaptureService(
                 Path(temp_dir),
@@ -37,10 +37,10 @@ class CaptureServiceTests(unittest.TestCase):
                 "_capture_primary_screen_with_gdi",
                 side_effect=lambda output_path: output_path.write_bytes(b"screen"),
             ) as capture_screen:
-                image_bytes, _ = service.capture_primary_screen()
+                with self.assertRaisesRegex(CaptureError, "不会退回到全屏截图"):
+                    service.capture_primary_screen()
 
-        self.assertEqual(image_bytes, b"screen")
-        capture_screen.assert_called_once()
+        capture_screen.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -25,14 +25,13 @@ class ScreenCaptureService:
 
     def capture_primary_screen(self) -> tuple[bytes, Path]:
         screenshot_path = self._next_capture_path()
-        if self.window_title_keyword:
-            self._capture_window_with_gdi(
-                screenshot_path,
-                title_keyword=self.window_title_keyword,
-                client_area=self.capture_client_area,
-            )
-        else:
-            self._capture_primary_screen_with_gdi(screenshot_path)
+        if not self.window_title_keyword:
+            raise CaptureError("未配置窗口标题关键词；为避免误截其他画面，本工具不会退回到全屏截图。")
+        self._capture_window_with_gdi(
+            screenshot_path,
+            title_keyword=self.window_title_keyword,
+            client_area=self.capture_client_area,
+        )
         image_bytes = screenshot_path.read_bytes()
         return image_bytes, screenshot_path
 

@@ -28,6 +28,10 @@ class PetRecognitionSampleStore:
                     screenshot_path TEXT,
                     player_pet_id INTEGER,
                     opponent_pet_id INTEGER,
+                    player_confirmed_pet_id INTEGER,
+                    opponent_confirmed_pet_id INTEGER,
+                    player_confirmed_name TEXT,
+                    opponent_confirmed_name TEXT,
                     player_confidence REAL,
                     opponent_confidence REAL,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -75,10 +79,29 @@ class PetRecognitionSampleStore:
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pet_artworks_pet_id ON pet_artworks(pet_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pet_samples_event ON pet_recognition_samples(event_id)")
+            self._ensure_event_columns(conn)
             self._ensure_sample_columns(conn)
             conn.commit()
         finally:
             conn.close()
+
+    @staticmethod
+    def _ensure_event_columns(conn: sqlite3.Connection) -> None:
+        existing_columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(pet_recognition_events)").fetchall()
+        }
+        migrations = {
+            "player_confirmed_pet_id": "ALTER TABLE pet_recognition_events ADD COLUMN player_confirmed_pet_id INTEGER",
+            "opponent_confirmed_pet_id": (
+                "ALTER TABLE pet_recognition_events ADD COLUMN opponent_confirmed_pet_id INTEGER"
+            ),
+            "player_confirmed_name": "ALTER TABLE pet_recognition_events ADD COLUMN player_confirmed_name TEXT",
+            "opponent_confirmed_name": "ALTER TABLE pet_recognition_events ADD COLUMN opponent_confirmed_name TEXT",
+        }
+        for column, statement in migrations.items():
+            if column not in existing_columns:
+                conn.execute(statement)
 
     @staticmethod
     def _ensure_sample_columns(conn: sqlite3.Connection) -> None:
@@ -118,6 +141,32 @@ class PetRecognitionSampleStore:
             )
             conn.commit()
             return int(cursor.lastrowid)
+        finally:
+            conn.close()
+
+    def update_event_confirmation(
+        self,
+        event_id: int,
+        *,
+        player_pet_id: int,
+        opponent_pet_id: int,
+        player_name: str,
+        opponent_name: str,
+    ) -> None:
+        conn = self._connect()
+        try:
+            conn.execute(
+                """
+                UPDATE pet_recognition_events
+                SET player_confirmed_pet_id = ?,
+                    opponent_confirmed_pet_id = ?,
+                    player_confirmed_name = ?,
+                    opponent_confirmed_name = ?
+                WHERE id = ?
+                """,
+                (player_pet_id, opponent_pet_id, player_name, opponent_name, event_id),
+            )
+            conn.commit()
         finally:
             conn.close()
 

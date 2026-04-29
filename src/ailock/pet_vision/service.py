@@ -64,6 +64,13 @@ class PetVisionService:
                 confirmed_name=opponent.name,
             ),
         ]
+        self.samples.update_event_confirmation(
+            event_id,
+            player_pet_id=player.id,
+            opponent_pet_id=opponent.id,
+            player_name=player.name,
+            opponent_name=opponent.name,
+        )
         self.body_index_store.rebuild_index()
         self.avatar_index_store.rebuild_index()
         return event_id, sample_ids

@@ -265,9 +265,25 @@ class PetVisionTests(unittest.TestCase):
                 ORDER BY id
                 """
             ).fetchall()
+            event_row = conn.execute(
+                """
+                SELECT
+                    player_confirmed_pet_id,
+                    opponent_confirmed_pet_id,
+                    player_confirmed_name,
+                    opponent_confirmed_name
+                FROM pet_recognition_events
+                WHERE id = ?
+                """,
+                (event_id,),
+            ).fetchone()
             conn.close()
             self.assertEqual(event_id, 1)
             self.assertEqual(len(sample_ids), 2)
+            self.assertEqual(event_row[0], pet_a)
+            self.assertEqual(event_row[1], pet_b)
+            self.assertEqual(event_row[2], "迪莫")
+            self.assertEqual(event_row[3], "喵喵")
             self.assertEqual([row[0] for row in rows], ["player", "opponent"])
             self.assertTrue(all(row[1] > 0 for row in rows))
             self.assertTrue(all("width" in row[2] for row in rows))
@@ -378,6 +394,34 @@ class PetVisionTests(unittest.TestCase):
 
             self.assertEqual(service.catalog.find_by_name("玩家手输新宠").source, "user_confirmation")  # type: ignore[union-attr]
             self.assertIsNotNone(service.catalog.find_by_name("喵喵"))
+
+    def test_sample_store_migrates_event_confirmation_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "knowledge.db"
+            conn = sqlite3.connect(database_path)
+            conn.execute(
+                """
+                CREATE TABLE pet_recognition_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    screenshot_path TEXT,
+                    player_pet_id INTEGER,
+                    opponent_pet_id INTEGER,
+                    player_confidence REAL,
+                    opponent_confidence REAL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.commit()
+            conn.close()
+
+            PetRecognitionSampleStore(database_path)
+
+            conn = sqlite3.connect(database_path)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(pet_recognition_events)")}
+            conn.close()
+            self.assertIn("player_confirmed_pet_id", columns)
+            self.assertIn("opponent_confirmed_name", columns)
 
 
 if __name__ == "__main__":
