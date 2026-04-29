@@ -14,15 +14,8 @@ wheels/
 # Local/private config
 config.toml
 
-# Local runtime/user data
+# Local/private runtime settings (contains API keys)
 data/settings.json
-data/captures/
-data/knowledge/
-data/logs/
-data/pet_vision/artworks/
-data/pet_vision/index/
-data/pet_vision/models/
-data/pet_vision/runtime_crops/
 
 # Local tooling state
 .omx/

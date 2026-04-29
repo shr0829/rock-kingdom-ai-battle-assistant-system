@@ -1,2 +1,9 @@
-data/knowledge.db filter=lfs diff=lfs merge=lfs -text
+data/**/*.db filter=lfs diff=lfs merge=lfs -text
+data/**/*.sqlite filter=lfs diff=lfs merge=lfs -text
+data/**/*.sqlite3 filter=lfs diff=lfs merge=lfs -text
+data/**/*.png filter=lfs diff=lfs merge=lfs -text
+data/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+data/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+data/**/*.npz filter=lfs diff=lfs merge=lfs -text
+data/**/*.onnx filter=lfs diff=lfs merge=lfs -text
 .githooks/* text eol=lf
