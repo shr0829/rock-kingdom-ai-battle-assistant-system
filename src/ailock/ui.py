@@ -6,13 +6,11 @@ from typing import Callable, TypeVar
 from PySide6.QtCore import QEvent, QObject, QRunnable, Qt, QThreadPool, Signal
 from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -21,7 +19,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QPlainTextEdit,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -144,7 +141,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("AI洛克 · 对战辅助")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.resize(980, 720)
+        self.resize(520, 720)
         self._build_ui()
         self._apply_styles()
         self._load_settings_to_form()
@@ -160,70 +157,44 @@ class MainWindow(QMainWindow):
         root = QWidget()
         layout = QVBoxLayout(root)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
 
         header = QLabel("AI洛克")
         header.setFont(QFont("Microsoft YaHei UI", 22, QFont.Weight.Bold))
-        subheader = QLabel("截图直接发给大模型 API，结合本地资料库给出洛克王国 PVP 回合建议")
+        header.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        subheader = QLabel("点击开始后自动截图、识别双方宠物并生成建议")
         subheader.setWordWrap(True)
+        subheader.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         layout.addWidget(header)
         layout.addWidget(subheader)
 
-        top_grid = QGridLayout()
-        top_grid.setColumnStretch(0, 1)
-        top_grid.setColumnStretch(1, 1)
-
-        settings_box = QGroupBox("模型配置")
-        settings_form = QFormLayout(settings_box)
-        self.api_key_input = QLineEdit()
-        self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.model_input = QLineEdit()
-        self.base_url_input = QLineEdit()
-        self.hotkey_input = QLineEdit()
-        self.hotkey_input.setReadOnly(True)
-        self.hotkey_edit_button = QPushButton("修改热键")
-        self.hotkey_edit_button.clicked.connect(self.edit_hotkey)
-        hotkey_row = QWidget()
-        hotkey_layout = QHBoxLayout(hotkey_row)
-        hotkey_layout.setContentsMargins(0, 0, 0, 0)
-        hotkey_layout.addWidget(self.hotkey_input, 1)
-        hotkey_layout.addWidget(self.hotkey_edit_button)
-        self.capture_window_title_input = QLineEdit()
-        self.capture_window_title_input.setPlaceholderText("洛克王国")
-        self.capture_client_area_input = QCheckBox("只截窗口内容区")
-        self.max_hits_input = QSpinBox()
-        self.max_hits_input.setRange(1, 20)
-        settings_form.addRow("API Key", self.api_key_input)
-        settings_form.addRow("Model", self.model_input)
-        settings_form.addRow("Base URL", self.base_url_input)
-        settings_form.addRow("窗口标题关键词", self.capture_window_title_input)
-        settings_form.addRow("窗口截图范围", self.capture_client_area_input)
-        settings_form.addRow("全局热键", hotkey_row)
-        settings_form.addRow("资料命中数", self.max_hits_input)
-
-        action_box = QGroupBox("操作")
-        action_layout = QVBoxLayout(action_box)
-        self.save_settings_button = QPushButton("保存设置")
+        start_row = QHBoxLayout()
+        start_row.addStretch(1)
         self.capture_button = QPushButton("开始")
         self.capture_button.setObjectName("startCaptureButton")
-        self.capture_button.setFixedSize(92, 92)
-        self.import_button = QPushButton("导入资料文件夹")
-        self.save_settings_button.clicked.connect(self.save_settings)
+        self.capture_button.setFixedSize(128, 128)
         self.capture_button.clicked.connect(self.start_capture_analysis)
-        self.import_button.clicked.connect(self.import_knowledge_folder)
-        action_layout.addWidget(self.save_settings_button)
-        action_layout.addWidget(self.capture_button)
-        action_layout.addWidget(self.import_button)
-        action_layout.addStretch(1)
+        start_row.addWidget(self.capture_button)
+        start_row.addStretch(1)
+        layout.addLayout(start_row)
 
-        top_grid.addWidget(settings_box, 0, 0)
-        top_grid.addWidget(action_box, 0, 1)
-        layout.addLayout(top_grid)
-
-        result_box = QGroupBox("分析结果")
-        result_layout = QVBoxLayout(result_box)
         self.status_label = QLabel("")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
+
+        self.detail_toggle_button = QPushButton("等待识别结果")
+        self.detail_toggle_button.setObjectName("detailToggleButton")
+        self.detail_toggle_button.setCheckable(True)
+        self.detail_toggle_button.setDisabled(True)
+        self.detail_toggle_button.toggled.connect(self._toggle_detail_panel)
+        layout.addWidget(self.detail_toggle_button)
+
+        self.detail_panel = QGroupBox("确认与建议")
+        self.detail_panel.setObjectName("detailPanel")
+        self.detail_panel.setVisible(False)
+        detail_layout = QVBoxLayout(self.detail_panel)
         self.state_output = QPlainTextEdit()
         self.state_output.setReadOnly(True)
         pet_confirm_box = QGroupBox("宠物识别确认")
@@ -242,16 +213,15 @@ class MainWindow(QMainWindow):
         self.advice_output.setReadOnly(True)
         self.evidence_output = QPlainTextEdit()
         self.evidence_output.setReadOnly(True)
-        result_layout.addWidget(QLabel("状态"))
-        result_layout.addWidget(self.status_label)
-        result_layout.addWidget(QLabel("战局识别"))
-        result_layout.addWidget(self.state_output, 2)
-        result_layout.addWidget(pet_confirm_box)
-        result_layout.addWidget(QLabel("推荐操作"))
-        result_layout.addWidget(self.advice_output, 2)
-        result_layout.addWidget(QLabel("资料依据"))
-        result_layout.addWidget(self.evidence_output, 2)
-        layout.addWidget(result_box, 1)
+        detail_layout.addWidget(pet_confirm_box)
+        detail_layout.addWidget(QLabel("建议"))
+        detail_layout.addWidget(self.advice_output, 2)
+        detail_layout.addWidget(QLabel("识别详情"))
+        detail_layout.addWidget(self.state_output, 2)
+        detail_layout.addWidget(QLabel("资料依据"))
+        detail_layout.addWidget(self.evidence_output, 2)
+        layout.addWidget(self.detail_panel, 1)
+        layout.addStretch(1)
 
         self.setCentralWidget(root)
 
@@ -271,7 +241,7 @@ class MainWindow(QMainWindow):
                 padding-top: 12px;
                 font-weight: bold;
             }
-            QLineEdit, QPlainTextEdit, QSpinBox {
+            QLineEdit, QPlainTextEdit, QSpinBox, QComboBox {
                 background: #16162F;
                 border: 1px solid #342A61;
                 border-radius: 8px;
@@ -292,44 +262,33 @@ class MainWindow(QMainWindow):
                 color: #A0AEC0;
             }
             QPushButton#startCaptureButton {
-                border-radius: 46px;
-                font-size: 18px;
+                border-radius: 64px;
+                font-size: 24px;
                 font-weight: 800;
+            }
+            QPushButton#detailToggleButton {
+                background: #16162F;
+                border: 1px solid #342A61;
+                border-radius: 8px;
+                padding: 8px 10px;
+                text-align: left;
+            }
+            QPushButton#detailToggleButton:checked {
+                border-color: #7C3AED;
+                background: #1E1B3F;
+            }
+            QGroupBox#detailPanel {
+                margin-top: 6px;
             }
             QLabel { background: transparent; }
             """
         )
 
     def _load_settings_to_form(self) -> None:
-        self.api_key_input.setText(self.settings.api_key)
-        self.model_input.setText(self.settings.model)
-        self.base_url_input.setText(self.settings.base_url)
-        self.hotkey_input.setText(self.settings.hotkey)
-        self.capture_window_title_input.setText(self.settings.capture_window_title)
-        self.capture_client_area_input.setChecked(self.settings.capture_window_client_area)
-        self.max_hits_input.setValue(self.settings.max_knowledge_hits)
+        return
 
     def _collect_settings(self) -> AppSettings:
-        return AppSettings(
-            api_key=self.api_key_input.text().strip(),
-            model_provider=self.settings.model_provider,
-            model=self.model_input.text().strip() or "gpt-5.5",
-            review_model=self.settings.review_model,
-            model_reasoning_effort=self.settings.model_reasoning_effort,
-            base_url=self.base_url_input.text().strip() or "https://api.asxs.top/v1",
-            wire_api=self.settings.wire_api,
-            requires_openai_auth=self.settings.requires_openai_auth,
-            disable_response_storage=self.settings.disable_response_storage,
-            network_access=self.settings.network_access,
-            windows_wsl_setup_acknowledged=self.settings.windows_wsl_setup_acknowledged,
-            model_context_window=self.settings.model_context_window,
-            model_auto_compact_token_limit=self.settings.model_auto_compact_token_limit,
-            hotkey=self.hotkey_input.text().strip() or "Ctrl+Shift+A",
-            max_knowledge_hits=self.max_hits_input.value(),
-            screenshot_detail=self.settings.screenshot_detail,
-            capture_window_title=self.capture_window_title_input.text().strip(),
-            capture_window_client_area=self.capture_client_area_input.isChecked(),
-        )
+        return self.settings
 
     def save_settings(self) -> None:
         self.settings = self._collect_settings()
@@ -339,21 +298,26 @@ class MainWindow(QMainWindow):
         self._update_status("设置已保存。")
 
     def edit_hotkey(self) -> None:
-        dialog = HotkeyDialog(self.hotkey_input.text().strip() or "Ctrl+Shift+A", self)
+        dialog = HotkeyDialog(self.settings.hotkey or "Ctrl+Shift+A", self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         hotkey_text = dialog.hotkey_text()
         if not hotkey_text:
             QMessageBox.warning(self, "AI洛克", "请先按下一个组合键。")
             return
-        self.hotkey_input.setText(hotkey_text)
-        self.save_settings()
+        self.settings = AppSettings(**{**self.settings.to_dict(), "hotkey": hotkey_text})
+        self.settings_saver(self.settings)
+        self.advisor.refresh_settings(self.settings)
+        self._register_hotkey()
         self._update_status(f"热键已改为：{hotkey_text}")
 
     def start_capture_analysis(self) -> None:
         self.save_settings()
         self.last_analysis_result = None
         self.confirm_pet_button.setDisabled(True)
+        self.detail_toggle_button.setDisabled(True)
+        self.detail_toggle_button.setChecked(False)
+        self.detail_toggle_button.setText("正在识别，请稍候…")
         self._set_busy(True, "正在截图并请求模型分析…")
         worker = FunctionWorker(self.advisor.capture_and_advise)
         worker.signals.finished.connect(self._handle_analysis_result)
@@ -417,6 +381,9 @@ class MainWindow(QMainWindow):
         )
         self.evidence_output.setPlainText(knowledge_text)
         self._populate_pet_confirmation(result)
+        self.detail_toggle_button.setDisabled(False)
+        self.detail_toggle_button.setText("识别完成 · 展开/收起确认和建议")
+        self.detail_toggle_button.setChecked(True)
         self._set_busy(False, "分析完成。")
 
     def confirm_pet_samples(self) -> None:
@@ -476,17 +443,21 @@ class MainWindow(QMainWindow):
 
     def _handle_worker_error(self, message: str) -> None:
         self._set_busy(False, "操作失败。")
+        self.detail_toggle_button.setDisabled(True)
+        self.detail_toggle_button.setChecked(False)
+        self.detail_toggle_button.setText("识别失败，请重试")
         QMessageBox.critical(self, "AI洛克", message)
 
     def _set_busy(self, busy: bool, status_text: str) -> None:
         self.capture_button.setDisabled(busy)
-        self.capture_button.setText("结束" if busy else "开始")
-        self.import_button.setDisabled(busy)
-        self.save_settings_button.setDisabled(busy)
+        self.capture_button.setText("识别中" if busy else "开始")
         self._update_status(status_text)
 
     def _update_status(self, text: str) -> None:
         self.status_label.setText(text)
+
+    def _toggle_detail_panel(self, expanded: bool) -> None:
+        self.detail_panel.setVisible(expanded)
 
     def _register_hotkey(self) -> None:
         try:
