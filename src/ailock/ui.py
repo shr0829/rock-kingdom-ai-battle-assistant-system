@@ -362,6 +362,9 @@ class MainWindow(QMainWindow):
                     "[对局对象]",
                     f"对方精灵: {battle_state.opponent_pet or '未稳定识别'}",
                     "",
+                    "[双通道识别]",
+                    *self._pet_channel_summary(result),
+                    "",
                     "[节奏与场面]",
                     f"关键信息: {'；'.join(key_notes)}",
                     "",
@@ -408,6 +411,27 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "AI洛克", str(exc))
             return
         self._update_status(f"宠物确认样本已入库：event={event_id}, samples={sample_ids}")
+
+    @staticmethod
+    def _pet_channel_summary(result: AnalysisResult) -> list[str]:
+        recognition = result.pet_recognition
+        if recognition is None:
+            return ["未启用本地宠物识别"]
+
+        def summarize_side(label: str, side_result) -> str:
+            body_top = side_result.body_candidates[0] if side_result.body_candidates else None
+            avatar_top = side_result.avatar_candidates[0] if side_result.avatar_candidates else None
+            body_text = f"{body_top.name}({body_top.confidence:.2f})" if body_top else "无"
+            avatar_text = f"{avatar_top.name}({avatar_top.confidence:.2f})" if avatar_top else "无"
+            return (
+                f"{label}: 融合={side_result.name or '未识别'}({side_result.confidence:.2f})；"
+                f"本体={body_text}；头像={avatar_text}"
+            )
+
+        return [
+            summarize_side("我方", recognition.player),
+            summarize_side("对方", recognition.opponent),
+        ]
 
     def _populate_pet_confirmation(self, result: AnalysisResult) -> None:
         self.player_pet_combo.clear()

@@ -118,6 +118,20 @@ uv run ailock
 
 建议截图时尽量包含完整战斗区域、我方状态、可见技能和关键场地信息。若截图信息不足，应用会优先给出保守建议，并提示需要补充确认的内容。
 
+## 本地宠物视觉识别
+
+宠物识别采用“参考图嵌入库”方案：先把 `data/pet_vision/artworks/` 中已有立绘和用户确认过的本体样本抽成特征索引，再把战斗截图裁出的本体区域、头像区域分别与索引做近邻匹配。头像样本不足时，头像通道也会临时使用立绘参考库做推理，但只作为轻量辅助，避免立绘与头像差异拖低本体判断；确认保存样本后会逐步累积头像索引，后续头像通道会优先直接使用已确认头像样本匹配，并在融合时成为主判断。
+
+默认后端是内置轻量参考图特征，适合本地低延迟运行。若后续放入真正的图像 embedding / feature ONNX 小模型，可使用：
+
+```text
+data/pet_vision/models/reference_embedding.onnx
+```
+
+如果该模型不存在或不可用，会自动退回到内置轻量图像特征，不影响应用启动。普通 ImageNet 分类模型（例如 `mobilenetv2-12.onnx` 的 1000 类 logits 输出）不会默认当作匹配 embedding 使用，因为这会降低立绘参考匹配的稳定性。ONNX 推理路径参考 `reference/MaaAssistantArknights` 中的做法：模型惰性加载、CPU 顺序执行、限制推理线程数，避免低延迟桌面工具被推理线程拖慢。
+
+模型文件属于本地运行资产，默认不提交到仓库。放入模型后删除 `data/pet_vision/index/`，下次识别会自动重建立绘/样本向量索引。
+
 ## 导入本地攻略资料
 
 点击界面中的“导入资料文件夹”，选择一个本地目录。程序会递归读取支持格式并写入 SQLite 知识库。
@@ -194,8 +208,6 @@ data/
   knowledge.db
   logs/              # 每次截图分析的分步耗时 JSONL 日志
   rocom_wiki/
-  rocom_wiki_smoke/
-  rocom_wiki_smoke_db/
   debug_pages/
   captures/          # 本地截图，默认不提交
   knowledge/         # 本地私有资料，默认不提交
@@ -208,8 +220,6 @@ data/
 
 - `data/knowledge.db`
 - `data/rocom_wiki/`
-- `data/rocom_wiki_smoke/`
-- `data/rocom_wiki_smoke_db/`
 - `data/debug_pages/`
 - `data/*_page_sample.html`
 

@@ -48,6 +48,12 @@ class PetRecognitionSampleStore:
                     crop_png BLOB NOT NULL,
                     crop_path TEXT,
                     roi_json TEXT NOT NULL,
+                    avatar_crop_png BLOB,
+                    avatar_crop_path TEXT,
+                    avatar_roi_json TEXT,
+                    body_crop_png BLOB,
+                    body_crop_path TEXT,
+                    body_roi_json TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -69,9 +75,28 @@ class PetRecognitionSampleStore:
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pet_artworks_pet_id ON pet_artworks(pet_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_pet_samples_event ON pet_recognition_samples(event_id)")
+            self._ensure_sample_columns(conn)
             conn.commit()
         finally:
             conn.close()
+
+    @staticmethod
+    def _ensure_sample_columns(conn: sqlite3.Connection) -> None:
+        existing_columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(pet_recognition_samples)").fetchall()
+        }
+        migrations = {
+            "avatar_crop_png": "ALTER TABLE pet_recognition_samples ADD COLUMN avatar_crop_png BLOB",
+            "avatar_crop_path": "ALTER TABLE pet_recognition_samples ADD COLUMN avatar_crop_path TEXT",
+            "avatar_roi_json": "ALTER TABLE pet_recognition_samples ADD COLUMN avatar_roi_json TEXT",
+            "body_crop_png": "ALTER TABLE pet_recognition_samples ADD COLUMN body_crop_png BLOB",
+            "body_crop_path": "ALTER TABLE pet_recognition_samples ADD COLUMN body_crop_path TEXT",
+            "body_roi_json": "ALTER TABLE pet_recognition_samples ADD COLUMN body_roi_json TEXT",
+        }
+        for column, statement in migrations.items():
+            if column not in existing_columns:
+                conn.execute(statement)
 
     def create_event(self, result: DualPetRecognitionResult) -> int:
         conn = self._connect()
@@ -104,16 +129,21 @@ class PetRecognitionSampleStore:
         pet_id: int,
         confirmed_name: str,
     ) -> int:
-        if result.crop is None:
-            raise ValueError("pet crop is required before saving a confirmed sample")
+        body_crop = result.crop_set.body if result.crop_set is not None else result.crop
+        avatar_crop = result.crop_set.avatar if result.crop_set is not None else None
+        if body_crop is None:
+            raise ValueError("pet body crop is required before saving a confirmed sample")
         conn = self._connect()
         try:
             cursor = conn.execute(
                 """
                 INSERT INTO pet_recognition_samples (
                     event_id, side, pet_id, confirmed_name, predicted_name, confidence,
-                    top_candidates, crop_png, crop_path, roi_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    top_candidates, crop_png, crop_path, roi_json,
+                    avatar_crop_png, avatar_crop_path, avatar_roi_json,
+                    body_crop_png, body_crop_path, body_roi_json,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (
                     event_id,
@@ -123,9 +153,15 @@ class PetRecognitionSampleStore:
                     result.name,
                     result.confidence,
                     json.dumps([candidate.to_dict() for candidate in result.top_candidates], ensure_ascii=False),
-                    result.crop.image_bytes,
-                    result.crop.path,
-                    json.dumps(result.crop.roi, ensure_ascii=False),
+                    body_crop.image_bytes,
+                    body_crop.path,
+                    json.dumps(body_crop.roi, ensure_ascii=False),
+                    avatar_crop.image_bytes if avatar_crop is not None else None,
+                    avatar_crop.path if avatar_crop is not None else None,
+                    json.dumps(avatar_crop.roi, ensure_ascii=False) if avatar_crop is not None else None,
+                    body_crop.image_bytes,
+                    body_crop.path,
+                    json.dumps(body_crop.roi, ensure_ascii=False),
                 ),
             )
             conn.commit()
@@ -185,16 +221,39 @@ class PetRecognitionSampleStore:
             conn.close()
         return [dict(row) for row in rows]
 
-    def load_confirmed_sample_sources(self) -> list[dict[str, object]]:
+    def load_confirmed_sample_sources(self, crop_kind: str = "body") -> list[dict[str, object]]:
+        if crop_kind not in {"avatar", "body"}:
+            raise ValueError(f"unsupported pet sample crop kind: {crop_kind}")
         conn = self._connect()
         try:
-            rows = conn.execute(
-                """
-                SELECT pet_id, confirmed_name AS name, crop_path AS local_path, crop_png AS image_bytes, '' AS source_url
-                FROM pet_recognition_samples
-                ORDER BY created_at DESC
-                """
-            ).fetchall()
+            if crop_kind == "avatar":
+                rows = conn.execute(
+                    """
+                    SELECT
+                        pet_id,
+                        confirmed_name AS name,
+                        avatar_crop_path AS local_path,
+                        avatar_crop_png AS image_bytes,
+                        '' AS source_url
+                    FROM pet_recognition_samples
+                    WHERE avatar_crop_png IS NOT NULL
+                    ORDER BY created_at DESC
+                    """
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT
+                        pet_id,
+                        confirmed_name AS name,
+                        COALESCE(NULLIF(body_crop_path, ''), crop_path) AS local_path,
+                        COALESCE(body_crop_png, crop_png) AS image_bytes,
+                        '' AS source_url
+                    FROM pet_recognition_samples
+                    WHERE COALESCE(body_crop_png, crop_png) IS NOT NULL
+                    ORDER BY created_at DESC
+                    """
+                ).fetchall()
         finally:
             conn.close()
         return [dict(row) for row in rows]

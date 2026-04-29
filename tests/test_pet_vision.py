@@ -15,6 +15,7 @@ from ailock.pet_vision import (
     PetVisionRecognizer,
     PetVisionService,
 )
+from ailock.pet_vision.features import ImageFeatureExtractor, cosine_similarity
 from ailock.pet_vision.types import DualPetRecognitionResult, PetCandidate, PetRecognitionResult
 
 
@@ -22,6 +23,17 @@ def write_image(path: Path, color: QColor, width: int = 120, height: int = 80) -
     image = QImage(width, height, QImage.Format.Format_RGB32)
     image.fill(color)
     assert image.save(str(path), "PNG")
+
+
+def transparent_subject_image(width: int, height: int, color: QColor) -> QImage:
+    image = QImage(width, height, QImage.Format.Format_RGBA8888)
+    image.fill(QColor(0, 0, 0, 0))
+    margin_x = width // 4
+    margin_y = height // 4
+    for y in range(margin_y, height - margin_y):
+        for x in range(margin_x, width - margin_x):
+            image.setPixelColor(x, y, color)
+    return image
 
 
 class PetVisionTests(unittest.TestCase):
@@ -82,8 +94,50 @@ class PetVisionTests(unittest.TestCase):
             self.assertEqual(set(crops), {"player", "opponent"})
             self.assertTrue(Path(crops["player"].path).exists())
             self.assertGreater(len(crops["opponent"].image_bytes), 0)
-            self.assertEqual(crops["player"].roi["width"], 70)
-            self.assertEqual(crops["opponent"].roi["height"], 45)
+            self.assertEqual(crops["player"].roi["width"], 72)
+            self.assertEqual(crops["opponent"].roi["height"], 48)
+
+    def test_cropper_writes_avatar_and_body_crops_for_each_side(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            screenshot = root / "capture.png"
+            write_image(screenshot, QColor("red"), width=200, height=100)
+            cropper = BattlePetCropper(root)
+
+            crop_sets = cropper.crop_both_sets(screenshot)
+
+            self.assertEqual(set(crop_sets), {"player", "opponent"})
+            self.assertEqual(crop_sets["player"].avatar.crop_kind, "avatar")
+            self.assertEqual(crop_sets["player"].body.crop_kind, "body")
+            self.assertTrue(Path(crop_sets["opponent"].avatar.path).exists())
+            self.assertTrue(Path(crop_sets["opponent"].body.path).exists())
+            self.assertLess(crop_sets["player"].avatar.roi["width"], crop_sets["player"].body.roi["width"])
+
+    def test_default_rois_match_windowed_battle_layout_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            screenshot = root / "capture.png"
+            write_image(screenshot, QColor("black"), width=2048, height=950)
+            cropper = BattlePetCropper(root)
+
+            crop_sets = cropper.crop_both_sets(screenshot)
+
+            self.assertEqual(
+                crop_sets["player"].avatar.roi,
+                {"x": 41, "y": 76, "width": 113, "height": 104},
+            )
+            self.assertEqual(
+                crop_sets["opponent"].avatar.roi,
+                {"x": 1710, "y": 76, "width": 113, "height": 104},
+            )
+            self.assertEqual(
+                crop_sets["player"].body.roi,
+                {"x": 348, "y": 428, "width": 737, "height": 504},
+            )
+            self.assertEqual(
+                crop_sets["opponent"].body.roi,
+                {"x": 1126, "y": 238, "width": 655, "height": 456},
+            )
 
     def test_index_recognizer_returns_ranked_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -115,6 +169,60 @@ class PetVisionTests(unittest.TestCase):
             self.assertEqual(result.pet_id, pet_id)
             self.assertGreaterEqual(result.confidence, 0.99)
 
+    def test_feature_extractor_ignores_transparent_padding(self) -> None:
+        extractor = ImageFeatureExtractor()
+        padded = transparent_subject_image(100, 100, QColor("red"))
+        cropped = transparent_subject_image(50, 50, QColor("red"))
+
+        score = cosine_similarity(
+            extractor.extract_from_image(padded),
+            extractor.extract_from_image(cropped),
+        )
+
+        self.assertGreater(score, 0.98)
+
+    def test_feature_extractor_falls_back_when_onnx_model_is_missing(self) -> None:
+        extractor = ImageFeatureExtractor(model_path=Path("missing-model.onnx"))
+
+        self.assertEqual(extractor.feature_version, 2)
+        self.assertEqual(extractor.backend_name, "handcrafted-reference-v2")
+
+    def test_feature_extractor_does_not_use_classifier_logits_as_default_embedding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            model = Path(temp_dir) / "mobilenetv2-12.onnx"
+            model.write_bytes(b"0" * 2048)
+
+            extractor = ImageFeatureExtractor(model_path=model)
+
+            self.assertEqual(extractor.feature_version, 2)
+            self.assertEqual(extractor.backend_name, "handcrafted-reference-v2")
+
+    def test_artwork_reference_name_uses_visible_artwork_name_before_catalog_chain_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            database_path = root / "knowledge.db"
+            catalog = PetCatalogStore(database_path)
+            catalog.upsert(name="果冻")
+            final_id = catalog.upsert(name="抹茶布丁", aliases=["果冻进化链"])
+            samples = PetRecognitionSampleStore(database_path)
+            artwork_path = root / "data" / "pet_vision" / "artworks" / "果冻进化链-54.png"
+            artwork_path.parent.mkdir(parents=True)
+            write_image(artwork_path, QColor("green"))
+            samples.upsert_artwork(
+                pet_id=final_id,
+                name="果冻进化链",
+                source_url="https://example.invalid/jelly.png",
+                local_path=str(artwork_path),
+                image_bytes=artwork_path.read_bytes(),
+            )
+
+            features = PetVisionIndexStore(root / "data", samples).rebuild_index()
+
+            self.assertEqual(len(features), 1)
+            self.assertEqual(features[0].name, "果冻")
+            self.assertIsNone(features[0].pet_id)
+            self.assertEqual(features[0].source_kind, "artwork_reference")
+
     def test_confirmation_saves_two_blob_samples(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -143,13 +251,104 @@ class PetVisionTests(unittest.TestCase):
             )
 
             conn = sqlite3.connect(root / "data" / "knowledge.db")
-            rows = conn.execute("SELECT side, length(crop_png), roi_json FROM pet_recognition_samples ORDER BY id").fetchall()
+            rows = conn.execute(
+                """
+                SELECT
+                    side,
+                    length(crop_png),
+                    roi_json,
+                    length(avatar_crop_png),
+                    length(body_crop_png),
+                    avatar_roi_json,
+                    body_roi_json
+                FROM pet_recognition_samples
+                ORDER BY id
+                """
+            ).fetchall()
             conn.close()
             self.assertEqual(event_id, 1)
             self.assertEqual(len(sample_ids), 2)
             self.assertEqual([row[0] for row in rows], ["player", "opponent"])
             self.assertTrue(all(row[1] > 0 for row in rows))
             self.assertTrue(all("width" in row[2] for row in rows))
+            self.assertTrue(all(row[3] > 0 for row in rows))
+            self.assertTrue(all(row[4] > 0 for row in rows))
+            self.assertTrue(all("width" in row[5] for row in rows))
+            self.assertTrue(all("width" in row[6] for row in rows))
+            self.assertEqual(len(service.avatar_index_store.ensure_index()), 2)
+            self.assertGreaterEqual(len(service.body_index_store.ensure_index()), 3)
+
+    def test_avatar_channel_uses_artwork_reference_until_confirmed_avatar_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            service = PetVisionService(data_dir=root / "data", database_path=root / "data" / "knowledge.db")
+            pet_id = service.catalog.upsert(name="迪莫")
+            artwork = root / "data" / "pet_vision" / "artworks" / "迪莫.png"
+            artwork.parent.mkdir(parents=True, exist_ok=True)
+            write_image(artwork, QColor("green"))
+            service.samples.upsert_artwork(
+                pet_id=pet_id,
+                name="迪莫",
+                source_url="https://example.invalid/dimo-green.png",
+                local_path=str(artwork),
+                image_bytes=artwork.read_bytes(),
+            )
+            service.body_index_store.rebuild_index()
+            screenshot = root / "capture.png"
+            write_image(screenshot, QColor("green"), width=200, height=100)
+
+            result = service.recognize_screenshot(screenshot)
+
+            self.assertEqual(result.player.name, "迪莫")
+            self.assertEqual(result.player.score_breakdown["body_weight"], 1.0)
+            self.assertEqual(result.player.score_breakdown["avatar_weight"], 0.15)
+            self.assertEqual(result.player.score_breakdown["body_index"]["source_counts"]["artwork_reference"], 1)
+            self.assertEqual(result.player.score_breakdown["avatar_index"]["source_counts"]["artwork_reference"], 1)
+            self.assertEqual(result.player.avatar_candidates[0].name, "迪莫")
+
+    def test_avatar_index_switches_to_confirmed_avatar_samples_when_available(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            service = PetVisionService(data_dir=root / "data", database_path=root / "data" / "knowledge.db")
+            pet_id = service.catalog.upsert(name="迪莫")
+            artwork = root / "data" / "pet_vision" / "artworks" / "迪莫.png"
+            artwork.parent.mkdir(parents=True, exist_ok=True)
+            write_image(artwork, QColor("green"))
+            service.samples.upsert_artwork(
+                pet_id=pet_id,
+                name="迪莫",
+                source_url="https://example.invalid/dimo-green.png",
+                local_path=str(artwork),
+                image_bytes=artwork.read_bytes(),
+            )
+            screenshot = root / "capture.png"
+            write_image(screenshot, QColor("green"), width=200, height=100)
+            result = service.recognize_screenshot(screenshot)
+
+            service.save_confirmation(result, player_name="迪莫", opponent_name="迪莫")
+
+            avatar_features = service.avatar_index_store.ensure_index()
+            self.assertEqual(len(avatar_features), 2)
+            self.assertEqual({item.source_kind for item in avatar_features}, {"confirmed_avatar"})
+
+    def test_fusion_adds_agreement_bonus_and_preserves_conflicting_channels(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            service = PetVisionService(data_dir=root / "data", database_path=root / "data" / "knowledge.db")
+
+            agreed, _ = service._fuse_candidates(
+                [PetCandidate(1, "迪莫", 0.9, channel="body")],
+                [PetCandidate(1, "迪莫", 0.8, channel="avatar:confirmed_avatar")],
+            )
+            conflicted, _ = service._fuse_candidates(
+                [PetCandidate(1, "迪莫", 0.9, channel="body")],
+                [PetCandidate(2, "喵喵", 0.8, channel="avatar:confirmed_avatar")],
+            )
+
+            self.assertEqual(agreed[0].name, "迪莫")
+            self.assertAlmostEqual(agreed[0].confidence, 0.885)
+            self.assertEqual(conflicted[0].name, "喵喵")
+            self.assertEqual({candidate.channel for candidate in conflicted}, {"body", "avatar"})
 
     def test_confirmation_accepts_user_typed_pet_name(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

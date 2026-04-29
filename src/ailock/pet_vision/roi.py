@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtGui import QImage
 
-from .types import PetCrop
+from .types import PetCrop, PetCropSet
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,47 +18,70 @@ class RatioRoi:
 
 
 class BattlePetCropper:
-    DEFAULT_PLAYER_ROI = RatioRoi(0.10, 0.35, 0.35, 0.45)
-    DEFAULT_OPPONENT_ROI = RatioRoi(0.45, 0.10, 0.40, 0.45)
+    DEFAULT_PLAYER_BODY_ROI = RatioRoi(0.17, 0.45, 0.36, 0.53)
+    DEFAULT_OPPONENT_BODY_ROI = RatioRoi(0.55, 0.25, 0.32, 0.48)
+    DEFAULT_PLAYER_AVATAR_ROI = RatioRoi(0.02, 0.08, 0.055, 0.11)
+    DEFAULT_OPPONENT_AVATAR_ROI = RatioRoi(0.835, 0.08, 0.055, 0.11)
+    DEFAULT_PLAYER_ROI = DEFAULT_PLAYER_BODY_ROI
+    DEFAULT_OPPONENT_ROI = DEFAULT_OPPONENT_BODY_ROI
 
     def __init__(
         self,
         data_dir: Path,
         player_roi: RatioRoi | None = None,
         opponent_roi: RatioRoi | None = None,
+        player_avatar_roi: RatioRoi | None = None,
+        opponent_avatar_roi: RatioRoi | None = None,
     ) -> None:
         self.data_dir = data_dir
-        self.player_roi = player_roi or self.DEFAULT_PLAYER_ROI
-        self.opponent_roi = opponent_roi or self.DEFAULT_OPPONENT_ROI
-        self.player_crop_dir = data_dir / "pet_vision" / "runtime_crops" / "player"
-        self.opponent_crop_dir = data_dir / "pet_vision" / "runtime_crops" / "opponent"
+        self.player_roi = player_roi or self.DEFAULT_PLAYER_BODY_ROI
+        self.opponent_roi = opponent_roi or self.DEFAULT_OPPONENT_BODY_ROI
+        self.player_avatar_roi = player_avatar_roi or self.DEFAULT_PLAYER_AVATAR_ROI
+        self.opponent_avatar_roi = opponent_avatar_roi or self.DEFAULT_OPPONENT_AVATAR_ROI
+        self.runtime_crop_dir = data_dir / "pet_vision" / "runtime_crops"
 
     def crop_both(self, screenshot_path: Path) -> dict[str, PetCrop]:
+        crop_sets = self.crop_both_sets(screenshot_path)
+        return {
+            "player": crop_sets["player"].body,
+            "opponent": crop_sets["opponent"].body,
+        }
+
+    def crop_both_sets(self, screenshot_path: Path) -> dict[str, PetCropSet]:
         image = QImage(str(screenshot_path))
         if image.isNull():
             raise ValueError(f"无法读取截图：{screenshot_path}")
         return {
-            "player": self._crop_one("player", image, screenshot_path, self.player_roi),
-            "opponent": self._crop_one("opponent", image, screenshot_path, self.opponent_roi),
+            "player": PetCropSet(
+                side="player",
+                avatar=self._crop_one("player", "avatar", image, screenshot_path, self.player_avatar_roi),
+                body=self._crop_one("player", "body", image, screenshot_path, self.player_roi),
+            ),
+            "opponent": PetCropSet(
+                side="opponent",
+                avatar=self._crop_one("opponent", "avatar", image, screenshot_path, self.opponent_avatar_roi),
+                body=self._crop_one("opponent", "body", image, screenshot_path, self.opponent_roi),
+            ),
         }
 
-    def _crop_one(self, side: str, image: QImage, screenshot_path: Path, roi: RatioRoi) -> PetCrop:
+    def _crop_one(self, side: str, crop_kind: str, image: QImage, screenshot_path: Path, roi: RatioRoi) -> PetCrop:
         rect = self._ratio_to_rect(image.width(), image.height(), roi)
         cropped = image.copy(rect["x"], rect["y"], rect["width"], rect["height"])
         if cropped.isNull():
-            raise ValueError(f"{side} 宠物 ROI 裁剪失败：{rect}")
-        output_dir = self.player_crop_dir if side == "player" else self.opponent_crop_dir
+            raise ValueError(f"{side} {crop_kind} 宠物 ROI 裁剪失败：{rect}")
+        output_dir = self.runtime_crop_dir / crop_kind / side
         output_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-        output_path = output_dir / f"{side}-{timestamp}.png"
+        output_path = output_dir / f"{side}-{crop_kind}-{timestamp}.png"
         if not cropped.save(str(output_path), "PNG"):
-            raise ValueError(f"{side} 宠物 crop 写入失败：{output_path}")
+            raise ValueError(f"{side} {crop_kind} 宠物 crop 写入失败：{output_path}")
         return PetCrop(
             side=side,
             image_bytes=output_path.read_bytes(),
             path=str(output_path),
             roi=rect,
             source_screenshot_path=str(screenshot_path),
+            crop_kind=crop_kind,
         )
 
     @staticmethod

@@ -13,6 +13,12 @@ class PetVisionRecognizer:
 
     def recognize(self, crop: PetCrop) -> PetRecognitionResult:
         indexed_features = self.index_store.ensure_index()
+        breakdown = {
+            "crop_kind": self.index_store.crop_kind,
+            "feature_backend": self.extractor.backend_name,
+            "reference_count": len(indexed_features),
+            "source_counts": self._source_counts(indexed_features),
+        }
         if not indexed_features:
             return PetRecognitionResult(
                 side=crop.side,
@@ -20,6 +26,7 @@ class PetVisionRecognizer:
                 name="",
                 confidence=0.0,
                 top_candidates=[],
+                score_breakdown=breakdown,
                 source="no_index",
                 crop_path=crop.path,
                 crop=crop,
@@ -32,6 +39,7 @@ class PetVisionRecognizer:
                 name=item.name,
                 confidence=round(score, 4),
                 source=item.source,
+                channel=f"{self.index_store.crop_kind}:{item.source_kind}",
             )
             for item, score in ranked[: self.top_k]
         ]
@@ -42,6 +50,7 @@ class PetVisionRecognizer:
             name=best.name if best else "",
             confidence=best.confidence if best else 0.0,
             top_candidates=top_candidates,
+            score_breakdown=breakdown,
             source="local_feature_index",
             crop_path=crop.path,
             crop=crop,
@@ -54,4 +63,19 @@ class PetVisionRecognizer:
     ) -> list[tuple[IndexedPetFeature, float]]:
         scored = [(item, cosine_similarity(query_feature, item.feature)) for item in indexed_features]
         scored.sort(key=lambda item: item[1], reverse=True)
-        return scored
+        unique: list[tuple[IndexedPetFeature, float]] = []
+        seen: set[tuple[str, str]] = set()
+        for item, score in scored:
+            key = ("id", str(item.pet_id)) if item.pet_id is not None else ("name", item.name)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append((item, score))
+        return unique
+
+    @staticmethod
+    def _source_counts(indexed_features: list[IndexedPetFeature]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in indexed_features:
+            counts[item.source_kind] = counts.get(item.source_kind, 0) + 1
+        return counts

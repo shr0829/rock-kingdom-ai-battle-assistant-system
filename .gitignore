@@ -21,6 +21,7 @@ data/knowledge/
 data/logs/
 data/pet_vision/artworks/
 data/pet_vision/index/
+data/pet_vision/models/
 data/pet_vision/runtime_crops/
 
 # Local tooling state

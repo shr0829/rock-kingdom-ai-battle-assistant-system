@@ -11,6 +11,14 @@ class PetCrop:
     path: str
     roi: dict[str, int]
     source_screenshot_path: str
+    crop_kind: str = "body"
+
+
+@dataclass(frozen=True, slots=True)
+class PetCropSet:
+    side: str
+    avatar: PetCrop
+    body: PetCrop
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +27,7 @@ class PetCandidate:
     name: str
     confidence: float
     source: str = ""
+    channel: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -26,6 +35,7 @@ class PetCandidate:
             "name": self.name,
             "confidence": self.confidence,
             "source": self.source,
+            "channel": self.channel,
         }
 
 
@@ -36,9 +46,13 @@ class PetRecognitionResult:
     name: str
     confidence: float
     top_candidates: list[PetCandidate] = field(default_factory=list)
+    body_candidates: list[PetCandidate] = field(default_factory=list)
+    avatar_candidates: list[PetCandidate] = field(default_factory=list)
+    score_breakdown: dict[str, Any] = field(default_factory=dict)
     source: str = ""
     crop_path: str = ""
     crop: PetCrop | None = None
+    crop_set: PetCropSet | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -47,9 +61,14 @@ class PetRecognitionResult:
             "name": self.name,
             "confidence": self.confidence,
             "top_candidates": [candidate.to_dict() for candidate in self.top_candidates],
+            "body_candidates": [candidate.to_dict() for candidate in self.body_candidates],
+            "avatar_candidates": [candidate.to_dict() for candidate in self.avatar_candidates],
+            "score_breakdown": self.score_breakdown,
             "source": self.source,
             "crop_path": self.crop_path,
             "roi": self.crop.roi if self.crop else {},
+            "avatar_roi": self.crop_set.avatar.roi if self.crop_set else {},
+            "body_roi": self.crop_set.body.roi if self.crop_set else self.crop.roi if self.crop else {},
         }
 
 

@@ -11,6 +11,7 @@ from .types import (
     PetCandidate,
     PetCatalogEntry,
     PetCrop,
+    PetCropSet,
     PetRecognitionResult,
 )
 
@@ -20,6 +21,7 @@ __all__ = [
     "PetCandidate",
     "PetCatalogEntry",
     "PetCrop",
+    "PetCropSet",
     "PetRecognitionResult",
     "PetCatalogStore",
     "PetRecognitionSampleStore",
