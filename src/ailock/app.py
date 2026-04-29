@@ -23,7 +23,7 @@ def main() -> int:
     settings = settings_store.load()
     advisor = AdvisorService(
         settings=settings,
-        capture_service=ScreenCaptureService(paths.captures_dir),
+        capture_service=ScreenCaptureService(paths.captures_dir, settings),
         knowledge_store=KnowledgeStore(paths.database_path),
         log_dir=paths.logs_dir,
     )

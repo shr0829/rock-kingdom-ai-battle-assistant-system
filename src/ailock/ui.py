@@ -6,6 +6,7 @@ from typing import Callable, TypeVar
 from PySide6.QtCore import QEvent, QObject, QRunnable, Qt, QThreadPool, Signal
 from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -186,11 +187,16 @@ class MainWindow(QMainWindow):
         hotkey_layout.setContentsMargins(0, 0, 0, 0)
         hotkey_layout.addWidget(self.hotkey_input, 1)
         hotkey_layout.addWidget(self.hotkey_edit_button)
+        self.capture_window_title_input = QLineEdit()
+        self.capture_window_title_input.setPlaceholderText("洛克王国")
+        self.capture_client_area_input = QCheckBox("只截窗口内容区")
         self.max_hits_input = QSpinBox()
         self.max_hits_input.setRange(1, 20)
         settings_form.addRow("API Key", self.api_key_input)
         settings_form.addRow("Model", self.model_input)
         settings_form.addRow("Base URL", self.base_url_input)
+        settings_form.addRow("窗口标题关键词", self.capture_window_title_input)
+        settings_form.addRow("窗口截图范围", self.capture_client_area_input)
         settings_form.addRow("全局热键", hotkey_row)
         settings_form.addRow("资料命中数", self.max_hits_input)
 
@@ -277,6 +283,8 @@ class MainWindow(QMainWindow):
         self.model_input.setText(self.settings.model)
         self.base_url_input.setText(self.settings.base_url)
         self.hotkey_input.setText(self.settings.hotkey)
+        self.capture_window_title_input.setText(self.settings.capture_window_title)
+        self.capture_client_area_input.setChecked(self.settings.capture_window_client_area)
         self.max_hits_input.setValue(self.settings.max_knowledge_hits)
 
     def _collect_settings(self) -> AppSettings:
@@ -297,6 +305,8 @@ class MainWindow(QMainWindow):
             hotkey=self.hotkey_input.text().strip() or "Ctrl+Shift+A",
             max_knowledge_hits=self.max_hits_input.value(),
             screenshot_detail=self.settings.screenshot_detail,
+            capture_window_title=self.capture_window_title_input.text().strip(),
+            capture_window_client_area=self.capture_client_area_input.isChecked(),
         )
 
     def save_settings(self) -> None:
