@@ -94,6 +94,7 @@ class AnalysisResult:
     battle_state: BattleState
     advice: AdviceResult
     knowledge_hits: list[KnowledgeEntry] = field(default_factory=list)
+    pet_recognition: Any | None = None
     screenshot_path: str = ""
     timing_log_path: str = ""
     timing_events: list[dict[str, Any]] = field(default_factory=list)

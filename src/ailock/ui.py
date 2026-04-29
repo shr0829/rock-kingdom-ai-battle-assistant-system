@@ -7,6 +7,7 @@ from PySide6.QtCore import QEvent, QObject, QRunnable, Qt, QThreadPool, Signal
 from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -139,6 +140,7 @@ class MainWindow(QMainWindow):
         self.settings_saver = settings_saver
         self.hotkey_manager = GlobalHotkeyManager(self)
         self.thread_pool = QThreadPool.globalInstance()
+        self.last_analysis_result: AnalysisResult | None = None
 
         self.setWindowTitle("AI洛克 · 对战辅助")
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
@@ -203,7 +205,9 @@ class MainWindow(QMainWindow):
         action_box = QGroupBox("操作")
         action_layout = QVBoxLayout(action_box)
         self.save_settings_button = QPushButton("保存设置")
-        self.capture_button = QPushButton("截图并分析")
+        self.capture_button = QPushButton("开始")
+        self.capture_button.setObjectName("startCaptureButton")
+        self.capture_button.setFixedSize(92, 92)
         self.import_button = QPushButton("导入资料文件夹")
         self.save_settings_button.clicked.connect(self.save_settings)
         self.capture_button.clicked.connect(self.start_capture_analysis)
@@ -222,6 +226,18 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("")
         self.state_output = QPlainTextEdit()
         self.state_output.setReadOnly(True)
+        pet_confirm_box = QGroupBox("宠物识别确认")
+        pet_confirm_layout = QFormLayout(pet_confirm_box)
+        self.player_pet_combo = QComboBox()
+        self.player_pet_combo.setEditable(True)
+        self.opponent_pet_combo = QComboBox()
+        self.opponent_pet_combo.setEditable(True)
+        self.confirm_pet_button = QPushButton("保存确认样本")
+        self.confirm_pet_button.setDisabled(True)
+        self.confirm_pet_button.clicked.connect(self.confirm_pet_samples)
+        pet_confirm_layout.addRow("我方宠物", self.player_pet_combo)
+        pet_confirm_layout.addRow("对方宠物", self.opponent_pet_combo)
+        pet_confirm_layout.addRow("", self.confirm_pet_button)
         self.advice_output = QPlainTextEdit()
         self.advice_output.setReadOnly(True)
         self.evidence_output = QPlainTextEdit()
@@ -230,6 +246,7 @@ class MainWindow(QMainWindow):
         result_layout.addWidget(self.status_label)
         result_layout.addWidget(QLabel("战局识别"))
         result_layout.addWidget(self.state_output, 2)
+        result_layout.addWidget(pet_confirm_box)
         result_layout.addWidget(QLabel("推荐操作"))
         result_layout.addWidget(self.advice_output, 2)
         result_layout.addWidget(QLabel("资料依据"))
@@ -273,6 +290,11 @@ class MainWindow(QMainWindow):
             QPushButton:disabled {
                 background: #342A61;
                 color: #A0AEC0;
+            }
+            QPushButton#startCaptureButton {
+                border-radius: 46px;
+                font-size: 18px;
+                font-weight: 800;
             }
             QLabel { background: transparent; }
             """
@@ -330,6 +352,8 @@ class MainWindow(QMainWindow):
 
     def start_capture_analysis(self) -> None:
         self.save_settings()
+        self.last_analysis_result = None
+        self.confirm_pet_button.setDisabled(True)
         self._set_busy(True, "正在截图并请求模型分析…")
         worker = FunctionWorker(self.advisor.capture_and_advise)
         worker.signals.finished.connect(self._handle_analysis_result)
@@ -348,6 +372,7 @@ class MainWindow(QMainWindow):
         self.thread_pool.start(worker)
 
     def _handle_analysis_result(self, result: AnalysisResult) -> None:
+        self.last_analysis_result = result
         battle_state = result.battle_state
         advice = result.advice
         knowledge_text = "\n\n".join(f"{item.title}\n{item.content}" for item in result.knowledge_hits) or "未命中本地资料。"
@@ -391,7 +416,60 @@ class MainWindow(QMainWindow):
             )
         )
         self.evidence_output.setPlainText(knowledge_text)
+        self._populate_pet_confirmation(result)
         self._set_busy(False, "分析完成。")
+
+    def confirm_pet_samples(self) -> None:
+        if self.last_analysis_result is None:
+            QMessageBox.warning(self, "AI洛克", "请先完成一次截图识别。")
+            return
+        player_name = self.player_pet_combo.currentText().strip()
+        opponent_name = self.opponent_pet_combo.currentText().strip()
+        if not player_name or not opponent_name:
+            QMessageBox.warning(self, "AI洛克", "请先选择我方和对方的标准宠物名。")
+            return
+        try:
+            event_id, sample_ids = self.advisor.save_pet_confirmation(
+                self.last_analysis_result,
+                player_name=player_name,
+                opponent_name=opponent_name,
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "AI洛克", str(exc))
+            return
+        self._update_status(f"宠物确认样本已入库：event={event_id}, samples={sample_ids}")
+
+    def _populate_pet_confirmation(self, result: AnalysisResult) -> None:
+        self.player_pet_combo.clear()
+        self.opponent_pet_combo.clear()
+        if result.pet_recognition is None:
+            self.player_pet_combo.addItem(result.battle_state.player_pet)
+            self.opponent_pet_combo.addItem(result.battle_state.opponent_pet)
+            self.confirm_pet_button.setDisabled(True)
+            return
+        catalog_names = self.advisor.list_pet_catalog_names()
+        player_candidates = self._candidate_names(
+            result.pet_recognition.player.top_candidates,
+            result.battle_state.player_pet,
+            catalog_names,
+        )
+        opponent_candidates = self._candidate_names(
+            result.pet_recognition.opponent.top_candidates,
+            result.battle_state.opponent_pet,
+            catalog_names,
+        )
+        self.player_pet_combo.addItems(player_candidates)
+        self.opponent_pet_combo.addItems(opponent_candidates)
+        self.confirm_pet_button.setDisabled(False)
+
+    @staticmethod
+    def _candidate_names(candidates, preferred_name: str, catalog_names: list[str]) -> list[str]:
+        names: list[str] = []
+        for name in [preferred_name, *(candidate.name for candidate in candidates), *catalog_names]:
+            name = str(name).strip()
+            if name and name not in names:
+                names.append(name)
+        return names
 
     def _handle_import_result(self, imported_count: int) -> None:
         self._set_busy(False, f"资料导入完成，共处理 {imported_count} 个文件。")
@@ -402,6 +480,7 @@ class MainWindow(QMainWindow):
 
     def _set_busy(self, busy: bool, status_text: str) -> None:
         self.capture_button.setDisabled(busy)
+        self.capture_button.setText("结束" if busy else "开始")
         self.import_button.setDisabled(busy)
         self.save_settings_button.setDisabled(busy)
         self._update_status(status_text)
