@@ -7,11 +7,13 @@ from ailock.battle_log import (
     BattleAction,
     BattleActionEffect,
     BattleCombatantSnapshot,
+    BattleCorrectionInput,
     BattleFieldSnapshot,
     BattleLogStore,
     BattleMoveSlot,
     BattleStepInput,
     BattleTeamMember,
+    BattleTeamMemberEvent,
 )
 from ailock.knowledge import KnowledgeStore
 from ailock.models import KnowledgeEntry
@@ -19,6 +21,141 @@ from ailock.pet_vision import PetCatalogStore
 
 
 class BattleLogStoreTests(unittest.TestCase):
+    def test_world_battle_schema_records_idempotent_event_corrections_and_team_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "knowledge.db"
+            pet_catalog = PetCatalogStore(database_path)
+            pet_id = pet_catalog.upsert(name="Dimo", aliases=["Holy Dimo"])
+            store = BattleLogStore(database_path)
+            session_id = store.start_session(
+                battle_mode="pvp",
+                battle_format="world",
+                rules={"level_normalized": True, "team_size": 3},
+                active_lock=True,
+                source="unit-test",
+            )
+
+            step = BattleStepInput(
+                turn_number=1,
+                step_number=1,
+                event_type="observe",
+                event_uuid="evt-001",
+                capture_run_id="analysis-run-001",
+                screenshot_path="data/captures/world-t1.png",
+                screenshot_sha256="abc123",
+                screenshot_width=1280,
+                screenshot_height=720,
+                roi_version="world-roi-v1",
+                recognizer_version="pet-vision-v1",
+                source_event="auto_capture",
+                client_created_at="2026-05-12T10:00:00",
+                field_snapshot=BattleFieldSnapshot(
+                    weather="sun",
+                    phase_modifier={"pvp_level_normalized": True},
+                ),
+                player=BattleCombatantSnapshot(
+                    side="player",
+                    team_slot=1,
+                    pet_name="Holy Dimo",
+                    level_normalized=True,
+                    hp_current=90,
+                    hp_max=100,
+                    resource_type="energy",
+                    resource_current=3,
+                    resource_max=6,
+                    stat_stage={"speed": 1},
+                    passive_name="bright",
+                    bloodline_name="lightline",
+                    shield_value=12,
+                    move_slots=[
+                        BattleMoveSlot(
+                            slot_index=1,
+                            skill_name="Light Strike",
+                            skill_name_raw="Light Strike?",
+                            skill_attribute="Light",
+                            skill_category="magic",
+                            priority=1,
+                            resource_cost_observed=2,
+                            resource_remaining=4,
+                            resource_max=5,
+                        )
+                    ],
+                ),
+                actions=[
+                    BattleAction(
+                        actor_side="player",
+                        actor_team_slot=1,
+                        action_type="guard",
+                        target_side="player",
+                        target_team_slot=1,
+                        resource_before=3,
+                        resource_after=2,
+                        effects=[
+                            BattleActionEffect(
+                                effect_type="shield_change",
+                                target_side="player",
+                                target_pet_name="Holy Dimo",
+                                shield_before=0,
+                                shield_after=12,
+                            )
+                        ],
+                    )
+                ],
+            )
+
+            step_id = store.append_step(session_id, step)
+            self.assertEqual(store.append_step(session_id, step), step_id)
+
+            correction_id = store.record_correction(
+                session_id,
+                BattleCorrectionInput(
+                    target_step_id=step_id,
+                    target_table="battle_combatant_snapshots",
+                    target_field="pet_name",
+                    old_value="Holy Dimo",
+                    new_value="Dimo",
+                    reason="user confirmed canonical pet name",
+                ),
+            )
+            team_event_id = store.record_team_member_event(
+                session_id,
+                BattleTeamMemberEvent(
+                    step_id=step_id,
+                    side="player",
+                    team_slot=1,
+                    event_type="confirmed",
+                    pet_name="Holy Dimo",
+                    new_value={"pet_name": "Dimo"},
+                    source_event="manual_confirm",
+                ),
+            )
+
+            self.assertGreater(correction_id, 0)
+            self.assertGreater(team_event_id, 0)
+            timeline = store.load_session_timeline(session_id)
+            self.assertTrue(timeline["session"]["active_lock"])
+            self.assertEqual(timeline["session"]["battle_mode"], "pvp")
+            self.assertEqual(timeline["team_events"][0]["event_type"], "confirmed")
+            loaded_step = timeline["steps"][0]
+            self.assertEqual(loaded_step["event_uuid"], "evt-001")
+            self.assertEqual(loaded_step["capture_run_id"], "analysis-run-001")
+            self.assertEqual(loaded_step["screenshot_sha256"], "abc123")
+            self.assertEqual(loaded_step["field_snapshot"]["phase_modifier"], {"pvp_level_normalized": True})
+            player = next(item for item in loaded_step["combatants"] if item["side"] == "player")
+            self.assertEqual(player["pet_id"], pet_id)
+            self.assertEqual(player["resource_type"], "energy")
+            self.assertEqual(player["resource_current"], 3)
+            self.assertEqual(player["stat_stage"], {"speed": 1})
+            self.assertEqual(player["shield_value"], 12)
+            move = player["move_slots"][0]
+            self.assertEqual(move["skill_attribute"], "Light")
+            self.assertEqual(move["resource_cost_observed"], 2)
+            action = loaded_step["actions"][0]
+            self.assertEqual(action["action_type"], "guard")
+            self.assertEqual(action["resource_before"], 3)
+            self.assertEqual(action["effects"][0]["shield_after"], 12)
+            self.assertEqual(loaded_step["corrections"][0]["new_value"], "Dimo")
+
     def test_append_step_links_pet_and_skill_references(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             database_path = Path(temp_dir) / "knowledge.db"
