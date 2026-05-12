@@ -20,8 +20,10 @@ class RatioRoi:
 class BattlePetCropper:
     DEFAULT_PLAYER_BODY_ROI = RatioRoi(0.17, 0.45, 0.36, 0.53)
     DEFAULT_OPPONENT_BODY_ROI = RatioRoi(0.55, 0.25, 0.32, 0.48)
-    DEFAULT_PLAYER_AVATAR_ROI = RatioRoi(0.02, 0.08, 0.055, 0.11)
-    DEFAULT_OPPONENT_AVATAR_ROI = RatioRoi(0.835, 0.08, 0.055, 0.11)
+    # Fixed from the battle screenshot layout: crop only the top status avatar
+    # icon, not the adjacent name/HP bar or the battlefield underneath.
+    DEFAULT_PLAYER_AVATAR_ROI = RatioRoi(0.0208, 0.0343, 0.0369, 0.0590)
+    DEFAULT_OPPONENT_AVATAR_ROI = RatioRoi(0.8363, 0.0371, 0.0369, 0.0590)
     DEFAULT_PLAYER_ROI = DEFAULT_PLAYER_BODY_ROI
     DEFAULT_OPPONENT_ROI = DEFAULT_OPPONENT_BODY_ROI
 

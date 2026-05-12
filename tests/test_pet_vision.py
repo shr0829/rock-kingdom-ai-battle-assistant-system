@@ -113,6 +113,24 @@ class PetVisionTests(unittest.TestCase):
             self.assertTrue(Path(crop_sets["opponent"].body.path).exists())
             self.assertLess(crop_sets["player"].avatar.roi["width"], crop_sets["player"].body.roi["width"])
 
+    def test_default_avatar_rois_match_reference_capture_proportions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            screenshot = root / "capture.png"
+            write_image(screenshot, QColor("black"), width=1680, height=1050)
+            cropper = BattlePetCropper(root)
+
+            crop_sets = cropper.crop_both_sets(screenshot)
+
+            self.assertEqual(
+                crop_sets["player"].avatar.roi,
+                {"x": 35, "y": 36, "width": 62, "height": 62},
+            )
+            self.assertEqual(
+                crop_sets["opponent"].avatar.roi,
+                {"x": 1405, "y": 39, "width": 62, "height": 62},
+            )
+
     def test_default_rois_match_windowed_battle_layout_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -124,11 +142,11 @@ class PetVisionTests(unittest.TestCase):
 
             self.assertEqual(
                 crop_sets["player"].avatar.roi,
-                {"x": 41, "y": 76, "width": 113, "height": 104},
+                {"x": 43, "y": 33, "width": 76, "height": 56},
             )
             self.assertEqual(
                 crop_sets["opponent"].avatar.roi,
-                {"x": 1710, "y": 76, "width": 113, "height": 104},
+                {"x": 1713, "y": 35, "width": 76, "height": 56},
             )
             self.assertEqual(
                 crop_sets["player"].body.roi,
