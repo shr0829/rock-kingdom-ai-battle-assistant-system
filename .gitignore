@@ -20,6 +20,7 @@ data/settings.json
 # Local tooling state
 .omx/
 .tmp-tests/
+data/skill_vision/runtime_crops/
 
 # Local reference checkouts
 reference/
